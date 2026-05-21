@@ -1,0 +1,9 @@
+2026-05-19 09:10:26 [INF] ========================================
+2026-05-19 09:10:26 [INF] BOOTING supervisor.startup v1.9.3
+2026-05-19 09:10:26 [INF] ========================================
+2026-05-19 09:10:26 [INF] PPM: found a modem (back)
+2026-05-19 09:10:26 [INF] BKPLN: WIRED PHY_UP back
+2026-05-19 09:10:26 [INF] BKPLN: WIRELESS PHY_UP back
+2026-05-19 09:24:57 [INF] terminate requested, closing sessions...
+2026-05-19 09:24:57 [INF] sessions closed
+2026-05-19 09:24:57 [INF] exited
