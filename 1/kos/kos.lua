@@ -1,19 +1,10 @@
-kos = kos or {}
+local kos = {}
 
-kos._processes = {}
+kos.log = function(msg)
+    print("[KOS] " .. tostring(msg))
+end
+
 kos._hooks = {}
-
-function kos.log(msg)
-    print("[KOS] " .. msg)
-end
-
-function kos.init()
-    kos.log("OS runtime initialized")
-end
-
--- =====================
--- HOOK SYSTEM
--- =====================
 
 function kos.on(event, fn)
     kos._hooks[event] = kos._hooks[event] or {}
@@ -29,29 +20,8 @@ function kos.trigger(event, ...)
     end
 end
 
--- =====================
--- PROCESS SYSTEM
--- =====================
-
-function kos.spawn(name, fn)
-    local pid = #kos._processes + 1
-
-    kos._processes[pid] = {
-        pid = pid,
-        name = name,
-        thread = coroutine.create(fn)
-    }
-
-    return pid
+function kos.init()
+    kos.log("initialized (addon mode)")
 end
 
-function kos.step()
-    for _, p in pairs(kos._processes) do
-        if coroutine.status(p.thread) ~= "dead" then
-            local ok, err = coroutine.resume(p.thread)
-            if not ok then
-                print("[PROC ERROR] " .. tostring(err))
-            end
-        end
-    end
-end
+return kos

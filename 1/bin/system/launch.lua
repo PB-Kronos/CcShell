@@ -1,8 +1,0 @@
-shell.setAlias("ls", "list")
-shell.setAlias("dir", "list")
-shell.setAlias("cp", "copy")
-shell.setAlias("mv", "move")
-shell.setAlias("rm", "delete")
-shell.setAlias("clr", "clear")
-shell.setAlias("rs", "redstone")
-shell.setAlias("sh", "shell")
