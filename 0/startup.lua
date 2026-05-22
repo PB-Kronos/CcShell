@@ -2,7 +2,7 @@
 
 print("[KOS] addon boot")
 
-local ok, kos = pcall(dofile, "/kos/kos.lua")
+local ok, kos = pcall(dofile, "/var/kos.lua")
 if ok and kos and kos.init then
     kos.init()
 end
