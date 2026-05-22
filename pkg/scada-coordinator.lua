@@ -1,0 +1,1 @@
+shell.run("pastebin run sqUN6VUb install coordinator")

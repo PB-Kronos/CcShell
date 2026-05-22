@@ -1,0 +1,1 @@
+shell.run("pastebin get sqUN6VUb /home/downloads/ccmsi.lua")
