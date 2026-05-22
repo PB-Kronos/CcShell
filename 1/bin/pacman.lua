@@ -1,4 +1,4 @@
--- pacman.lua (GitHub mode package manager)
+-- pacman.lua (file execution GitHub package manager)
 
 local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/pkg"
 local DB_PATH = "/var/pacman.db"
@@ -17,6 +17,7 @@ end
 
 local function ensureDB()
     if not fs.exists(DB_PATH) then
+        fs.makeDir("/var")
         local f = fs.open(DB_PATH, "w")
         f.write("{}")
         f.close()
@@ -37,95 +38,107 @@ local function saveDB(db)
     f.close()
 end
 
--- =========================
--- Execution environment
--- =========================
-
-local function runPackage(code, name, ...)
-    local env = {
-        fs = fs,
-        shell = shell,
-        os = os,
-        http = http,
-        textutils = textutils,
-        term = term,
-        paintutils = paintutils,
-        colors = colors,
-        vector = vector,
-        sleep = sleep,
-        print = print,
-        pairs = pairs,
-        ipairs = ipairs,
-        tostring = tostring,
-        tonumber = tonumber,
-        error = error,
-    }
-
-    local fn, err = load(code, "@" .. name, "t", env)
-    if not fn then
-        return false, err
-    end
-
-    return pcall(fn, ...)
+local function writeTmp(path, content)
+    fs.makeDir("/tmp")
+    local f = fs.open(path, "w")
+    f.write(content)
+    f.close()
 end
 
-local function runRemote(path, ...)
-    local code, err = fetch(REPO .. "/" .. path)
+local function runTmp(path, ...)
+    return shell.run(path, ...)
+end
+
+-- =========================
+-- Remote execution layer
+-- =========================
+
+local function runRemote(pkgPath, tmpPath, ...)
+    local url = REPO .. "/" .. pkgPath
+
+    local code, err = fetch(url)
     if not code then
         return false, err
     end
-    return runPackage(code, path, ...)
+
+    writeTmp(tmpPath, code)
+    return runTmp(tmpPath, ...)
 end
 
 -- =========================
--- Package operations
+-- DB
+-- =========================
+
+local function isInstalled(pkg)
+    local db = loadDB()
+    return db[pkg] == true
+end
+
+local function markInstalled(pkg)
+    local db = loadDB()
+    db[pkg] = true
+    saveDB(db)
+end
+
+local function markRemoved(pkg)
+    local db = loadDB()
+    db[pkg] = nil
+    saveDB(db)
+end
+
+-- =========================
+-- Package commands
 -- =========================
 
 local function install(pkg, ...)
-    print("Installing package:", pkg)
+    print("Installing:", pkg)
 
-    local ok, err = runRemote(pkg .. "/install.lua", ...)
+    local ok, err = runRemote(
+        pkg .. "/install.lua",
+        "/tmp/install.lua",
+        ...
+    )
+
     if not ok then
         return print("Install failed:", err)
     end
 
-    local db = loadDB()
-    db[pkg] = true
-    saveDB(db)
-
+    markInstalled(pkg)
     print("Installed:", pkg)
 end
 
 local function remove(pkg, force)
-    local db = loadDB()
-
-    if db[pkg] and not force then
-        print("Removing package:", pkg)
-    elseif not force then
+    if isInstalled(pkg) or force then
+        print("Removing:", pkg)
+    else
         return print("Package not installed:", pkg)
     end
 
-    local ok, err = runRemote(pkg .. "/remove.lua")
+    local ok, err = runRemote(
+        pkg .. "/remove.lua",
+        "/tmp/remove.lua"
+    )
+
     if not ok then
         return print("Remove failed:", err)
     end
 
-    db[pkg] = nil
-    saveDB(db)
-
+    markRemoved(pkg)
     print("Removed:", pkg)
 end
 
 local function upgrade(pkg, ...)
-    local path = pkg .. "/upgrade.lua"
+    print("Upgrading:", pkg)
 
-    local code = fetch(REPO .. "/" .. path)
+    local code = fetch(REPO .. "/" .. pkg .. "/upgrade.lua")
+
     if code then
-        print("Running upgrade script for:", pkg)
-        return runPackage(code, path, ...)
+        writeTmp("/tmp/upgrade.lua", code)
+        return runTmp("/tmp/upgrade.lua", ...)
     end
 
     print("No upgrade script, reinstalling...")
+
     remove(pkg, true)
     install(pkg, ...)
 end
@@ -134,19 +147,19 @@ local function list()
     local db = loadDB()
     print("Installed packages:")
 
-    for k in pairs(db) do
+    for pkg in pairs(db) do
         local version = "unknown"
 
-        local vcode = fetch(REPO .. "/" .. k .. "/version.lua")
-        if vcode then
-            local fn = load(vcode, "@version.lua", "t", {})
+        local code = fetch(REPO .. "/" .. pkg .. "/version.lua")
+        if code then
+            local fn = load(code, "@version.lua", "t", {})
             if fn then
                 local ok, v = pcall(fn)
                 if ok then version = v end
             end
         end
 
-        print("-", k, version)
+        print("-", pkg, version)
     end
 end
 
@@ -171,6 +184,7 @@ end
 
 local function syncAll()
     local db = loadDB()
+
     for pkg in pairs(db) do
         upgrade(pkg)
     end
@@ -210,7 +224,7 @@ else
     print("-R <pkg>          remove")
     print("-Rf <pkg>         force remove")
     print("-U <pkg>          upgrade")
-    print("-Syu               upgrade all")
+    print("-Syu              upgrade all")
     print("-Q <pkg>          query version")
     print("-L                list installed")
 end
