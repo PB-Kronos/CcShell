@@ -1,9 +1,62 @@
-local PKG_ROOT = "/main/pkg"
+-- =========================
+-- CONFIG
+-- =========================
+
+local REPO_BASE = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/pkg/"
 local DB_FILE = "/var/pacman/db.txt"
 
--- ----------------------------
--- DB helpers
--- ----------------------------
+-- =========================
+-- HTTP FETCH
+-- =========================
+
+local function fetch(path)
+    local url = REPO_BASE .. path
+
+    if not http then
+        return nil, "HTTP API not enabled"
+    end
+
+    local res = http.get(url)
+    if not res then
+        return nil, "Failed to fetch: " .. url
+    end
+
+    local data = res.readAll()
+    res.close()
+
+    return data
+end
+
+local function runRemote(path, ...)
+    local code, err = fetch(path)
+    if not code then
+        return false, err
+    end
+
+    local env = setmetatable({
+        shell = shell,
+        fs = fs,
+        http = http,
+        textutils = textutils,
+        term = term,
+        print = print,
+        pairs = pairs,
+        ipairs = ipairs,
+        tostring = tostring,
+        tonumber = tonumber,
+        error = error,
+    }, { __index = _G })
+
+    local fn, err2 = load(code, "@" .. path, "t", env)
+    if not fn then
+        return false, err2
+    end
+
+    return pcall(fn, ...)
+end
+-- =========================
+-- DB SYSTEM
+-- =========================
 
 local function ensureDB()
     if not fs.exists("/var/pacman") then
@@ -53,43 +106,21 @@ local function dbHas(pkg)
     return readDB()[pkg] ~= nil
 end
 
--- ----------------------------
--- package helpers
--- ----------------------------
-
-local function pkgPath(pkg)
-    return fs.combine(PKG_ROOT, pkg)
-end
-
--- UPDATED: now supports args
-local function runFile(path, ...)
-    if not fs.exists(path) then
-        return false, "Missing file: " .. path
-    end
-
-    local fn, err = loadfile(path, nil, _G)
-    if not fn then
-        return false, err
-    end
-
-    return pcall(fn, ...)
-end
-
--- ----------------------------
--- version system
--- ----------------------------
+-- =========================
+-- VERSION
+-- =========================
 
 local function getVersion(pkg)
-    local vfile = pkgPath(pkg .. "/version.lua")
+    local path = pkg .. "/version.lua"
 
-    if not fs.exists(vfile) then
-        return "unknown"
-    end
+    local code = fetch(path)
+    if not code then return "unknown" end
 
-    local ok, result = pcall(dofile, vfile)
-    if not ok then
-        return "error"
-    end
+    local fn = load(code, "@" .. path, "t", _G)
+    if not fn then return "error" end
+
+    local ok, result = pcall(fn)
+    if not ok then return "error" end
 
     if type(result) == "table" then
         return result.version or "unknown"
@@ -98,15 +129,14 @@ local function getVersion(pkg)
     return tostring(result)
 end
 
--- ----------------------------
--- install / remove / upgrade
--- ----------------------------
+-- =========================
+-- PACKAGE OPS
+-- =========================
 
--- UPDATED: accepts args
-local function install(pkg, installArgs)
+local function install(pkg, args)
     print("Installing:", pkg)
 
-    local ok, err = runFile(pkgPath(pkg .. "/install.lua"), table.unpack(installArgs or {}))
+    local ok, err = runRemote(pkg .. "/install.lua", table.unpack(args or {}))
     if not ok then
         return false, err
     end
@@ -122,7 +152,7 @@ local function remove(pkg, force)
 
     print("Removing:", pkg)
 
-    local ok, err = runFile(pkgPath(pkg .. "/remove.lua"))
+    local ok, err = runRemote(pkg .. "/remove.lua")
     if not ok then
         return false, err
     end
@@ -132,11 +162,13 @@ local function remove(pkg, force)
 end
 
 local function upgrade(pkg)
-    local path = pkgPath(pkg .. "/upgrade.lua")
+    local path = pkg .. "/upgrade.lua"
 
-    if fs.exists(path) then
+    local code = fetch(path)
+    if code then
         print("Upgrading:", pkg)
-        return runFile(path)
+        local fn = load(code, "@" .. path, "t", _G)
+        return pcall(fn)
     else
         print("Reinstalling:", pkg)
         remove(pkg, true)
@@ -150,9 +182,9 @@ local function upgradeAll()
     end
 end
 
--- ----------------------------
--- query system
--- ----------------------------
+-- =========================
+-- VERSION FILE SAFETY CHECK
+-- =========================
 
 local function listPackages(verbose)
     local db = readDB()
@@ -176,9 +208,9 @@ local function query(pkg)
     print("Version:", getVersion(pkg))
 end
 
--- ----------------------------
+-- =========================
 -- CLI
--- ----------------------------
+-- =========================
 
 local args = { ... }
 local cmd = args[1]
