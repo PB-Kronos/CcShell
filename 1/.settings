@@ -1,5 +1,4 @@
 {
-  [ "opus.boot_option" ] = 1,
   [ "list.show_hidden" ] = true,
   safe_boot = false,
   [ "motd.enable" ] = false,

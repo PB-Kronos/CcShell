@@ -1,255 +1,74 @@
 local args = { ... }
 
--- =====================
--- CONFIG (settings-based)
--- =====================
-local REPO = settings.get("repo") or "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/pkg"
-local DB_PATH = settings.get("db_path") or "/var/kpkg/db.json"
+local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/pkg"
 
--- =====================
--- DB
--- =====================
-local function loadDB()
-    if not fs.exists(DB_PATH) then return {} end
-
-    local f = fs.open(DB_PATH, "r")
-    local data = f.readAll()
-    f.close()
-
-    return textutils.unserialize(data) or {}
-end
-
-local function saveDB(db)
-    local dir = fs.getDir(DB_PATH)
-    if dir and dir ~= "" and not fs.exists(dir) then
-        fs.makeDir(dir)
-    end
-
-    local f = fs.open(DB_PATH, "w")
-    f.write(textutils.serialize(db))
-    f.close()
-end
-
--- =====================
--- HTTP
--- =====================
 local function fetch(url)
-    if not http then
-        print("HTTP not enabled")
-        return nil
-    end
-
     local h = http.get(url)
     if not h then return nil end
-
-    local data = h.readAll()
+    local d = h.readAll()
     h.close()
-
-    return data
+    return d
 end
 
--- =====================
--- FILE OPS
--- =====================
-local function writeFile(path, content)
-    local dir = fs.getDir(path)
-    if dir and dir ~= "" and not fs.exists(dir) then
-        fs.makeDir(dir)
-    end
-
-    local f = fs.open(path, "w")
-    if not f then return false end
-    f.write(content)
-    f.close()
-    return true
+local function resolve(pkg)
+    return {
+        pkg .. "/setup.lua",
+        pkg .. ".lua"
+    }
 end
 
--- =====================
--- MANIFEST
--- =====================
-local function loadManifest(pkg)
-    local src = fetch(REPO .. "/" .. pkg .. "/manifest.lua")
-    if not src then return nil end
-
-    local fn, err = load(src)
-    if not fn then
-        print("Manifest load error: " .. err)
-        return nil
-    end
-
-    local ok, result = pcall(fn)
-    if not ok then
-        print("Manifest runtime error: " .. result)
-        return nil
-    end
-
-    return result
-end
-
--- =====================
--- SINGLE INSTALLER SUPPORT
--- =====================
-local function runSinglePackage(pkg)
-    local url = REPO .. "/single/" .. pkg .. ".lua"
-    local src = fetch(url)
-
-    if not src then return false end
-
-    print("Running installer for " .. pkg)
-
-    local fn, err = load(src)
-    if not fn then
-        print("Installer load error: " .. err)
-        return true
-    end
-
-    local ok, err = pcall(fn)
-    if not ok then
-        print("Installer runtime error: " .. err)
-    end
-
-    return true
-end
-
--- =====================
--- INSTALL
--- =====================
-local function install(pkg, db)
-    if not pkg then
-        print("Usage: pacman -S <pkg>")
-        return
-    end
-
-    -- 1. Try manifest package
-    local manifest = loadManifest(pkg)
-
-    if manifest then
-        print("Installing " .. (manifest.name or pkg))
-
-        for _, file in ipairs(manifest.files or {}) do
-            local data = fetch(REPO .. "/" .. pkg .. "/files/" .. file)
-
-            if data then
-                local path = "/" .. file
-                writeFile(path, data)
-                print(" + " .. file)
-            else
-                print(" ! failed: " .. file)
-            end
-        end
-
-        db[pkg] = {
-            version = manifest.version,
-            files = manifest.files
-        }
-
-        print("Installed " .. pkg)
-        return
-    end
-
-    -- 2. Try single installer
-    if runSinglePackage(pkg) then
-        return
-    end
-
-    -- 3. Not found
-    print("Package not found: " .. pkg)
-end
-
--- =====================
--- REMOVE
--- =====================
-local function remove(pkg, db)
-    if not pkg then
-        print("Usage: pacman -R <pkg>")
-        return
-    end
-
-    local entry = db[pkg]
-
-    if not entry then
-        print("Package not installed: " .. pkg)
-        return
-    end
-
-    print("Removing " .. pkg)
-
-    for _, file in ipairs(entry.files or {}) do
-        local path = "/" .. file
-
-        if fs.exists(path) then
-            fs.delete(path)
-            print(" - " .. file)
+local function find(pkg)
+    for _, path in ipairs(resolve(pkg)) do
+        local data = fetch(REPO .. "/" .. path)
+        if data then
+            return path, data
         end
     end
-
-    db[pkg] = nil
-    print("Removed " .. pkg)
 end
 
--- =====================
--- QUERY
--- =====================
-local function query(db)
-    print("Installed packages:")
+local function run(code, path)
+    local env = setmetatable({
+        shell = shell,
+        fs = fs,
+        os = os,
+        http = http,
+        print = print,
+        pairs = pairs,
+        ipairs = ipairs,
+        error = error,
+    }, { __index = _G })
 
-    for name, info in pairs(db) do
-        print("- " .. name .. " (" .. (info.version or "?") .. ")")
-    end
-end
-
--- =====================
--- UPGRADE ALL
--- =====================
-local function upgrade(db)
-    print("Upgrading system...")
-
-    local list = {}
-    for pkg in pairs(db) do
-        table.insert(list, pkg)
+    local fn, err = load(code, "@" .. path, "t", env)
+    if not fn then
+        print(err)
+        return
     end
 
-    for _, pkg in ipairs(list) do
-        remove(pkg, db)
-        install(pkg, db)
-    end
-
-    print("Upgrade complete")
-end
-
--- =====================
--- CLI
--- =====================
-local db = loadDB()
-
-local function has(flag)
-    for _, v in ipairs(args) do
-        if v == flag then return true end
-    end
-    return false
+    return pcall(fn)
 end
 
 local cmd = args[1]
 local target = args[2]
 
 if cmd == "-S" then
-    install(target, db)
+    if not target then
+        print("usage: pacman -S <pkg>")
+        return
+    end
 
-elseif cmd == "-R" then
-    remove(target, db)
+    local path, data = find(target)
 
-elseif cmd == "-Syu" then
-    upgrade(db)
+    if not data then
+        print("package not found: " .. target)
+        return
+    end
+
+    print("running " .. path)
+    run(data, path)
 
 elseif cmd == "-Q" then
-    query(db)
+    print("query not implemented")
 
 else
-    print("pacman usage:")
-    print("  pacman -S <pkg>")
-    print("  pacman -R <pkg>")
-    print("  pacman -Syu")
-    print("  pacman -Q")
+    print("pacman -S <pkg>")
 end
-
-saveDB(db)
