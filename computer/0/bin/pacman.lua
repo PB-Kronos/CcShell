@@ -63,7 +63,7 @@ local function runPackage(code, name, ...)
         error = error,
 	table = table,
 	pkg = pkg,
-	download = download,
+	downloader = download,
     }
 
     local fn, err = load(code, "@" .. name, "t", env)
