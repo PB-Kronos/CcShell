@@ -7,11 +7,10 @@ if ok and kos and kos.init then
     kos.init()
 end
 
-if shell then
-    local current = shell.path() or ""
-    --shell.setPath(current .. ":/bin")
-    shell.setPath("/bin)
-end
+--if shell then
+--    local current = shell.path() or ""
+--    shell.setPath(current .. ":/bin")
+--end
 
 if shell then
     shell.setAlias("ll", "list")
