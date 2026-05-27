@@ -1,27 +1,27 @@
 -- Setup paths
-local sPath = ".:/bin/programs:/bin"
+local sPath = ".:/bin/rom/programs:/bin/rom:/bin"
 if term.isColor() then
-    sPath = sPath..":/bin/programs/advanced"
+    sPath = sPath..":/bin/rom/programs/advanced"
 end
 if turtle then
-    sPath = sPath..":/bin/programs/turtle"
+    sPath = sPath..":/bin/rom/programs/turtle"
 else
-    sPath = sPath..":/bin/programs/rednet:/bin/programs/fun"
+    sPath = sPath..":/bin/rom/programs/rednet:/bin/programs/fun"
     if term.isColor() then
-        sPath = sPath..":/bin/programs/fun/advanced"
+        sPath = sPath..":/bin/rom/programs/fun/advanced"
     end
 end
 if pocket then
-    sPath = sPath..":/bin/programs/pocket"
+    sPath = sPath..":/bin/rom/programs/pocket"
 end
 if commands then
-    sPath = sPath..":/bin/programs/command"
+    sPath = sPath..":/bin/rom/programs/command"
 end
 if http then
-    sPath = sPath..":/bin/programs/http"
+    sPath = sPath..":/bin/rom/programs/http"
 end
 shell.setPath( sPath )
-help.setPath( "/bin/help" )
+help.setPath( "/bin/rom/help" )
 
 -- Setup aliases
 shell.setAlias( "ls", "list" )
@@ -224,20 +224,20 @@ if turtle then
             return completeMultipleChoice( sText, tEquipOptions )
         end
     end
-    shell.setCompletionFunction( "rom/programs/turtle/go.lua", completeGo )
-    shell.setCompletionFunction( "rom/programs/turtle/turn.lua", completeTurn )
-    shell.setCompletionFunction( "rom/programs/turtle/equip.lua", completeEquip )
-    shell.setCompletionFunction( "rom/programs/turtle/unequip.lua", completeUnequip )
+    shell.setCompletionFunction( "bin/rom/programs/turtle/go.lua", completeGo )
+    shell.setCompletionFunction( "bin/rom/programs/turtle/turn.lua", completeTurn )
+    shell.setCompletionFunction( "bin/rom/programs/turtle/equip.lua", completeEquip )
+    shell.setCompletionFunction( "bin/rom/programs/turtle/unequip.lua", completeUnequip )
 end
 
 
 -- Run autorun files
-if fs.exists( "/bin/autorun" ) and fs.isDir( "/bin/autorun" ) then
-    local tFiles = fs.list( "/bin/autorun" )
+if fs.exists( "/bin/rom/autorun" ) and fs.isDir( "/bin/rom/autorun" ) then
+    local tFiles = fs.list( "/bin/rom/autorun" )
     table.sort( tFiles )
     for n, sFile in ipairs( tFiles ) do
         if string.sub( sFile, 1, 1 ) ~= "." then
-            local sPath = "/bin/autorun/"..sFile
+            local sPath = "/bin/rom/autorun/"..sFile
             if not fs.isDir( sPath ) then
                 shell.run( sPath )
             end

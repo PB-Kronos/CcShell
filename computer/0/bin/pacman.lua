@@ -2,7 +2,7 @@
 
 local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/pkg"
 local DB_PATH = "/var/pacman.db"
-
+local download = false
 -- =========================
 -- Utilities
 -- =========================
@@ -63,6 +63,7 @@ local function runPackage(code, name, ...)
         error = error,
 	table = table,
 	pkg = pkg,
+	download = download,
     }
 
     local fn, err = load(code, "@" .. name, "t", env)
@@ -210,11 +211,11 @@ end
 local args = {...}
 local cmd = args[1]
 
-if cmd == "-S" then
+if cmd == "-S" or cmd == "-D" then
+    if cmd == "-D" then download = true else download = false end
     for i = 2, #args do
         install(args[i])
     end
-
 elseif cmd == "-R" then
     for i = 2, #args do
         remove(args[i], false)
