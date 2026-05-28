@@ -2,11 +2,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import subprocess
 import os
 import ctypes
+from python import bridgefs
 
 # -------------------------
 # STATE
 # -------------------------
-pending = None  # Python → CraftOS buffer
+pending = None  # Python â†’ CraftOS buffer
 
 # -------------------------
 # WINDOWS ACTIONS
@@ -27,6 +28,30 @@ def lock_windows():
 
 def run_program(path):
     subprocess.Popen(path)
+
+def host_read(path):
+    try:
+        return bridgefs.read_text(path)
+    except Exception as e:
+        send(f"read error: {str(e)}")
+        return ""
+
+def host_write(path, data):
+    try:
+        bridgefs.write_text(path, data)
+        send("ok")
+    except Exception as e:
+        send(f"write error: {str(e)}")
+
+def host_exists(path):
+    return "true" if bridgefs.exists(path) else "false"
+
+def host_list(path):
+    try:
+        return "\n".join(bridgefs.list_dir(path))
+    except Exception as e:
+        send(f"list error: {str(e)}")
+        return ""
 
 # -------------------------
 # EXEC SYSTEM
@@ -172,7 +197,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(text.encode())
 
-    # Python → CraftOS
+    # Python â†’ CraftOS
     def do_GET(self):
         global pending
 
@@ -185,7 +210,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
             print("[WARN] Unknown GET:", self.path)
 
-    # CraftOS → Python
+    # CraftOS â†’ Python
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         data = self.rfile.read(length).decode()
