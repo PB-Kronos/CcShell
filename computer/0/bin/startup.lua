@@ -289,3 +289,4 @@ if tUserStartups then
         shell.run( v )
     end
 end
+if fs.exists("/bin/execute.lua") then dofile("/bin/execute.lua") end
