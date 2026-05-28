@@ -110,6 +110,53 @@ def handle_message(msg):
         run_exec(" ".join(args))
     elif cmd == "execwait":
         run_execwait(" ".join(args))
+    elif cmd == "read":
+        send(host_read(" ".join(args)))
+    elif cmd == "write":
+        if len(args) >= 2:
+            host_write(args[0], " ".join(args[1:]))
+        else:
+            send("usage: write <path> <data>")
+    elif cmd == "exists":
+        send(host_exists(" ".join(args)))
+    elif cmd == "list":
+        send(host_list(" ".join(args) if args else "/"))
+    elif cmd == "mkdir":
+        try:
+            bridgefs.make_dir(" ".join(args))
+            send("ok")
+        except Exception as e:
+            send(f"mkdir error: {str(e)}")
+    elif cmd == "delete":
+        try:
+            bridgefs.delete(" ".join(args))
+            send("ok")
+        except Exception as e:
+            send(f"delete error: {str(e)}")
+    elif cmd == "copy":
+        try:
+            if len(args) >= 2:
+                bridgefs.copy(args[0], args[1])
+                send("ok")
+            else:
+                send("usage: copy <src> <dst>")
+        except Exception as e:
+            send(f"copy error: {str(e)}")
+    elif cmd == "move":
+        try:
+            if len(args) >= 2:
+                bridgefs.move(args[0], args[1])
+                send("ok")
+            else:
+                send("usage: move <src> <dst>")
+        except Exception as e:
+            send(f"move error: {str(e)}")
+    elif cmd == "run":
+        try:
+            subprocess.Popen(" ".join(args), shell=True)
+            send("ok")
+        except Exception as e:
+            send(f"run error: {str(e)}")
     else:
         send("unknown command: " + cmd)
 
