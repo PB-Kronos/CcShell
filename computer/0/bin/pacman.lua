@@ -145,6 +145,7 @@ local function runPackage(code, name, ...)
         table = table,
         pkg = pkg,
         downloader = download,
+	sys = sys,
     }
 
     local fn, err = load(code, "@" .. name, "t", env)
