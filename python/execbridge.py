@@ -4,10 +4,16 @@ import os
 import ctypes
 import sys
 from pathlib import Path
+import urllib.request
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import bridgefs
+try:
+    import bridgefs
+except ModuleNotFoundError:
+    bridgefs = None
+
+GITHUB_RAW_BASE = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main"
 
 # -------------------------
 # STATE
@@ -57,6 +63,17 @@ def host_list(path):
     except Exception as e:
         send(f"list error: {str(e)}")
         return ""
+
+def repo_download(src, dst):
+    url = f"{GITHUB_RAW_BASE}/{src.lstrip('/')}"
+    try:
+        target = Path(dst)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with urllib.request.urlopen(url) as response:
+            target.write_bytes(response.read())
+        return "ok"
+    except Exception as e:
+        return f"download error: {str(e)}"
 
 # -------------------------
 # EXEC SYSTEM
@@ -151,6 +168,19 @@ def handle_message(msg):
         send(host_exists(" ".join(args)))
     elif cmd == "list":
         send(host_list(" ".join(args) if args else "/"))
+    elif cmd == "download":
+        try:
+            if len(args) >= 2:
+                if bridgefs and hasattr(bridgefs, "download"):
+                    bridgefs.download(args[0], args[1])
+                else:
+                    send(repo_download(args[0], args[1]))
+                    return
+                send("ok")
+            else:
+                send("usage: download <repo-path-or-url> <dst>")
+        except Exception as e:
+            send(f"download error: {str(e)}")
     else:
         send("unknown command: " + cmd)
 

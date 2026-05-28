@@ -7,7 +7,7 @@ local function ensure_sys()
 end
 
 local function usage()
-    print("Usage: file <read|write|exists|list|readlines|mkdir|copy|move|delete|run> [args]")
+    print("Usage: file <read|write|exists|list|readlines|mkdir|copy|move|delete|run|download> [args]")
 end
 
 local function run()
@@ -69,6 +69,10 @@ local function run()
     elseif cmd == "run" then
         if not args[2] then return usage() end
         return sys.fs.run(args[2])
+
+    elseif cmd == "download" then
+        if not args[2] or not args[3] then return usage() end
+        return sys.fs.download(args[2], args[3])
     end
 
     usage()

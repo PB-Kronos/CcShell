@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import shutil
+import urllib.request
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+GITHUB_RAW_BASE = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main"
 
 
 def _normalize(path: str) -> str:
@@ -12,14 +14,6 @@ def _normalize(path: str) -> str:
 
 
 def resolve_path(path: str) -> Path:
-    """
-    Resolve path to the host filesystem.
-
-    - Absolute Windows or UNC paths are used as-is.
-    - Relative paths are resolved against the repo root so existing package
-      scripts keep working.
-    """
-
     raw = _normalize(path)
     if not raw:
         return REPO_ROOT.resolve()
@@ -81,3 +75,19 @@ def move(src: str, dst: str) -> None:
     target = resolve_path(dst)
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(source), str(target))
+
+
+def download(src: str, dst: str) -> None:
+    """
+    Download a file from the repo or a full URL into the host filesystem.
+
+    - If src starts with http:// or https://, it is fetched directly.
+    - Otherwise src is treated as a path inside the GitHub repo.
+    """
+
+    url = src if src.startswith(("http://", "https://")) else f"{GITHUB_RAW_BASE}/{src.lstrip('/')}"
+    target = resolve_path(dst)
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    with urllib.request.urlopen(url) as response:
+        target.write_bytes(response.read())

@@ -92,6 +92,10 @@ function sys.fs.run(path)
   return sys.execute("run " .. path)
 end
 
+function sys.fs.download(src, dst)
+  return sys.execute("download " .. src .. " " .. dst)
+end
+
 -- ONE-SHOT MODE
 if #args > 0 then
   sys.execute(table.concat(args, " "))
