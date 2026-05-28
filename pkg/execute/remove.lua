@@ -43,5 +43,4 @@ local function remove_startup_hook()
 end
 
 remove_file("/bin/execute.lua")
-remove_file("/bin/file.lua")
 remove_startup_hook()

@@ -80,6 +80,10 @@ function sys.fs.move(src, dst)
   return sys.execute("move " .. src .. " " .. dst)
 end
 
+function sys.fs.replace(src, dst)
+  return sys.execute("replace " .. src .. " " .. dst)
+end
+
 function sys.fs.delete(path)
   return sys.execute("delete " .. path)
 end

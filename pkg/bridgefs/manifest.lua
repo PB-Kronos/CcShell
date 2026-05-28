@@ -1,5 +1,5 @@
 return {
   version = "1.0",
-  desc = "Interact with the host filesystem using execute",
+  desc = "Host filesystem addon for execute",
   dependencies = { "base", "execute" },
 }

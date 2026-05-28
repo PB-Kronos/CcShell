@@ -7,7 +7,7 @@ local function ensure_sys()
 end
 
 local function usage()
-    print("Usage: file <read|write|exists|list|readlines|mkdir|copy|move|delete|run|download> [args]")
+    print("Usage: file <read|write|exists|list|readlines|mkdir|copy|move|replace|delete|run|download> [args]")
 end
 
 local function run()
@@ -61,6 +61,10 @@ local function run()
     elseif cmd == "move" then
         if not args[2] or not args[3] then return usage() end
         return sys.fs.move(args[2], args[3])
+
+    elseif cmd == "replace" then
+        if not args[2] or not args[3] then return usage() end
+        return sys.fs.replace(args[2], args[3])
 
     elseif cmd == "delete" then
         if not args[2] then return usage() end
