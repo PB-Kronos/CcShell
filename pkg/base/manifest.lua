@@ -1,0 +1,5 @@
+return {
+  version = "1.0",
+  desc = "Install the base runtime layout from the source tree",
+  dependencies = {},
+}

@@ -39,6 +39,98 @@ local function saveDB(db)
     f.close()
 end
 
+local function isInstalled(pkg, db)
+    db = db or loadDB()
+    return db[pkg] ~= nil
+end
+
+local function readRemoteTable(path)
+    local code = fetch(REPO .. "/" .. path)
+    if not code then
+        return nil, "missing"
+    end
+
+    local fn, err = load(code, "@" .. path, "t", {})
+    if not fn then
+        return nil, err
+    end
+
+    local ok, result = pcall(fn)
+    if not ok then
+        return nil, result
+    end
+
+    if type(result) ~= "table" then
+        return nil, "expected table"
+    end
+
+    return result
+end
+
+local function getPackageManifest(pkg)
+    local manifest, err = readRemoteTable(pkg .. "/manifest.lua")
+    if manifest then
+        return manifest
+    end
+
+    local meta, metaErr = readRemoteTable(pkg .. "/version.lua")
+    if meta then
+        return meta
+    end
+
+    return nil, err or metaErr
+end
+
+local function extractDependencies(manifest)
+    local deps = manifest and (manifest.dependencies or manifest.depends or manifest.deps)
+    if not deps then
+        return {}
+    end
+
+    local result = {}
+    if type(deps) == "string" then
+        result[1] = deps
+    elseif type(deps) == "table" then
+        for _, dep in ipairs(deps) do
+            if type(dep) == "string" then
+                result[#result + 1] = dep
+            elseif type(dep) == "table" then
+                local name = dep.name or dep.package or dep.pkg or dep[1]
+                if name then
+                    result[#result + 1] = name
+                end
+            end
+        end
+    end
+
+    return result
+end
+
+local function installDependencies(pkg, manifest, seen)
+    local deps = extractDependencies(manifest)
+    if #deps == 0 then
+        return true
+    end
+
+    seen = seen or {}
+    seen[pkg] = true
+
+    for _, dep in ipairs(deps) do
+        if not isInstalled(dep) then
+            if seen[dep] then
+                return false, "dependency cycle detected: " .. dep
+            end
+
+            local ok, err = install(dep, seen)
+            if not ok then
+                return false, err
+            end
+        end
+    end
+
+    return true
+end
+
 -- =========================
 -- Execution environment
 -- =========================
@@ -88,29 +180,53 @@ end
 -- Package operations
 -- =========================
 
-local function install(pkg, ...)
+function install(pkg, seen, ...)
+    if type(seen) ~= "table" then
+        seen = nil
+    end
+
     print("Installing package:", pkg)
+
+    local manifest, manifestErr = getPackageManifest(pkg)
+    if manifestErr == "missing" then
+        print("Warning: no manifest.lua for", pkg, "falling back to version.lua metadata")
+    elseif not manifest then
+        print("Warning: could not load manifest for", pkg, ":", manifestErr)
+    end
+
+    local okDeps, depErr = installDependencies(pkg, manifest, seen)
+    if not okDeps then
+        print("Dependency install failed:", depErr)
+        return false, depErr
+    end
 
     local ok, err = runRemote(pkg .. "/install.lua", ...)
     if not ok then
         print("Install failed:", err)
-        return
+        return false, err
     end
 
     local version = "unknown"
     local desc = "no description"
 
-    local vcode = fetch(REPO .. "/" .. pkg .. "/version.lua")
-    if vcode then
-        local fn = load(vcode, "@version.lua", "t", {})
-        if fn then
-            local ok, v = pcall(fn)
-            if ok then
-                if type(v) == "table" then
-                    version = v.version or version
-                    desc = v.desc or desc
-                else
-                    version = v
+    if manifest then
+        if type(manifest) == "table" then
+            version = manifest.version or version
+            desc = manifest.desc or desc
+        end
+    else
+        local vcode = fetch(REPO .. "/" .. pkg .. "/version.lua")
+        if vcode then
+            local fn = load(vcode, "@version.lua", "t", {})
+            if fn then
+                local okVersion, v = pcall(fn)
+                if okVersion then
+                    if type(v) == "table" then
+                        version = v.version or version
+                        desc = v.desc or desc
+                    else
+                        version = v
+                    end
                 end
             end
         end
@@ -121,6 +237,7 @@ local function install(pkg, ...)
     saveDB(db)
 
     print("Installed:", pkg)
+    return true
 end
 
 local function remove(pkg, force)
