@@ -9,6 +9,5 @@ local function install()
     if fs.exists("/var/cache/file.lua") then shell.run("wget https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/pkg/execute/file.lua /var/cache/file.lua") end
     if fs.exists("/bin/file.lua") then error("module /bin/file.lua already exists", 0) else fs.copy("/var/cache/file.lua", "/bin/file.lua") end
     if fs.exists("/bin/file.lua") then print("Install verified") return else error("Install failed, module /bin/file.lua could not be verified", 0) end
-
-end end
+end
 if downloader then down() elseif downloader == false then install() else error("download is nil") end
