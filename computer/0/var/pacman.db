@@ -1,6 +1,10 @@
 {
-  base = {
-    desc = "Install the base runtime layout from the source tree",
+  execute = {
+    desc = "Execute windows commands and manage your system with a http python based bridge",
     version = "1.0",
+  },
+  base = {
+    version = "1.0",
+    desc = "Install the base runtime layout from the source tree",
   },
 }

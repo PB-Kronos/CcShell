@@ -2,7 +2,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import subprocess
 import os
 import ctypes
-from python import bridgefs
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import bridgefs
 
 # -------------------------
 # STATE
