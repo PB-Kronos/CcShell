@@ -2,6 +2,7 @@
 
 local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/pkg"
 local DB_PATH = "/var/pacman.db"
+local download = false
 
 -- =========================
 -- Utilities
@@ -37,6 +38,88 @@ local function saveDB(db)
     f.close()
 end
 
+local function isInstalled(pkg, db)
+    db = db or loadDB()
+    return db[pkg] ~= nil
+end
+
+local function readRemoteTable(path)
+    local code = fetch(REPO .. "/" .. path)
+    if not code then
+        return nil, "missing"
+    end
+
+    local fn, err = load(code, "@" .. path, "t", {})
+    if not fn then
+        return nil, err
+    end
+
+    local ok, result = pcall(fn)
+    if not ok then
+        return nil, result
+    end
+
+    if type(result) ~= "table" then
+        return nil, "expected table"
+    end
+
+    return result
+end
+
+local function getPackageManifest(pkg)
+    return readRemoteTable(pkg .. "/manifest.lua")
+end
+
+local function extractDependencies(manifest)
+    local deps = manifest and (manifest.dependencies or manifest.depends or manifest.deps)
+    if not deps then
+        return {}
+    end
+
+    local result = {}
+    if type(deps) == "string" then
+        result[1] = deps
+    elseif type(deps) == "table" then
+        for _, dep in ipairs(deps) do
+            if type(dep) == "string" then
+                result[#result + 1] = dep
+            elseif type(dep) == "table" then
+                local name = dep.name or dep.package or dep.pkg or dep[1]
+                if name then
+                    result[#result + 1] = name
+                end
+            end
+        end
+    end
+
+    return result
+end
+
+local function installDependencies(pkg, manifest, seen)
+    local deps = extractDependencies(manifest)
+    if #deps == 0 then
+        return true
+    end
+
+    seen = seen or {}
+    seen[pkg] = true
+
+    for _, dep in ipairs(deps) do
+        if not isInstalled(dep) then
+            if seen[dep] then
+                return false, "dependency cycle detected: " .. dep
+            end
+
+            local ok, err = install(dep, seen)
+            if not ok then
+                return false, err
+            end
+        end
+    end
+
+    return true
+end
+
 -- =========================
 -- Execution environment
 -- =========================
@@ -59,8 +142,9 @@ local function runPackage(code, name, ...)
         tostring = tostring,
         tonumber = tonumber,
         error = error,
-	table = table,
-	pkg = pkg,
+        table = table,
+        pkg = pkg,
+        downloader = download,
     }
 
     local fn, err = load(code, "@" .. name, "t", env)
@@ -83,19 +167,42 @@ end
 -- Package operations
 -- =========================
 
-local function install(pkg, ...)
+function install(pkg, seen, ...)
+    if type(seen) ~= "table" then
+        seen = nil
+    end
+
     print("Installing package:", pkg)
+
+    local manifest, manifestErr = getPackageManifest(pkg)
+    if not manifest then
+        print("Warning: could not load manifest for", pkg, ":", manifestErr)
+    end
+
+    local okDeps, depErr = installDependencies(pkg, manifest, seen)
+    if not okDeps then
+        print("Dependency install failed:", depErr)
+        return false, depErr
+    end
 
     local ok, err = runRemote(pkg .. "/install.lua", ...)
     if not ok then
-        return print("Install failed:", err)
+        print("Install failed:", err)
+        return false, err
     end
 
+    local version = "unknown"
+    local desc = "no description"
+
+    version = manifest.version or version
+    desc = manifest.desc or desc
+
     local db = loadDB()
-    db[pkg] = true
+    db[pkg] = { version = version, desc = desc }
     saveDB(db)
 
     print("Installed:", pkg)
+    return true
 end
 
 local function remove(pkg, force)
@@ -104,12 +211,14 @@ local function remove(pkg, force)
     if db[pkg] and not force then
         print("Removing package:", pkg)
     elseif not force then
-        return print("Package not installed:", pkg)
+        print("Package not installed:", pkg)
+        return
     end
 
     local ok, err = runRemote(pkg .. "/remove.lua")
     if not ok then
-        return print("Remove failed:", err)
+        print("Remove failed:", err)
+        return
     end
 
     db[pkg] = nil
@@ -124,7 +233,11 @@ local function upgrade(pkg, ...)
     local code = fetch(REPO .. "/" .. path)
     if code then
         print("Running upgrade script for:", pkg)
-        return runPackage(code, path, ...)
+        local ok, err = runPackage(code, path, ...)
+        if not ok then
+            print("Upgrade failed:", err)
+        end
+        return
     end
 
     print("No upgrade script, reinstalling...")
@@ -136,36 +249,33 @@ local function list()
     local db = loadDB()
     print("Installed packages:")
 
-    for k in pairs(db) do
-        local version = "unknown"
-
-        local vcode = fetch(REPO .. "/" .. k .. "/version.lua")
-        if vcode then
-            local fn = load(vcode, "@version.lua", "t", {})
-            if fn then
-                local ok, v = pcall(fn)
-                if ok then version = v end
-            end
+    for k, v in pairs(db) do
+        if type(v) == "table" then
+            print("-", k, v.version or "unknown", "-", v.desc or "")
+        else
+            print("-", k, v or "unknown")
         end
-
-        print("-", k, version)
     end
 end
 
 local function query(pkg)
-    local code = fetch(REPO .. "/" .. pkg .. "/version.lua")
+    local code = fetch(REPO .. "/" .. pkg .. "/manifest.lua")
     if not code then
         return print("Package not found:", pkg)
     end
 
-    local fn = load(code, "@version.lua", "t", {})
+    local fn = load(code, "@manifest.lua", "t", {})
     if not fn then
-        return print("Invalid version file")
+        return print("Invalid manifest file")
     end
 
     local ok, v = pcall(fn)
     if ok then
-        print(pkg .. " version:", v)
+        if type(v) == "table" then
+            print(pkg, v.version or "unknown", "-", v.desc or "")
+        else
+            print(pkg .. " version:", v)
+        end
     else
         print("Error reading version")
     end
@@ -185,23 +295,33 @@ end
 local args = {...}
 local cmd = args[1]
 
-if cmd == "-S" then
-    install(args[2], table.unpack(args, 3))
-
+if cmd == "-S" or cmd == "-D" then
+    if cmd == "-D" then download = true else download = false end
+    for i = 2, #args do
+        install(args[i])
+    end
 elseif cmd == "-R" then
-    remove(args[2], false)
+    for i = 2, #args do
+        remove(args[i], false)
+    end
 
 elseif cmd == "-Rf" then
-    remove(args[2], true)
+    for i = 2, #args do
+        remove(args[i], true)
+    end
 
 elseif cmd == "-U" then
-    upgrade(args[2], table.unpack(args, 3))
+    for i = 2, #args do
+        upgrade(args[i])
+    end
 
 elseif cmd == "-Syu" then
     syncAll()
 
 elseif cmd == "-Q" then
-    query(args[2])
+    for i = 2, #args do
+        query(args[i])
+    end
 
 elseif cmd == "-L" then
     list()
