@@ -6,6 +6,8 @@ import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import ctypes
+import ctypes.wintypes
+import threading
 
 
 HERE = Path(__file__).resolve().parent
@@ -19,12 +21,37 @@ except ModuleNotFoundError:
 pending = None
 CRAFTOS_ROOT = Path(os.path.expandvars(r"%APPDATA%")) / "CraftOS-PC"
 _taskbar_hidden = False
+_windows_key_blocked = False
+_keyboard_hook = None
+_hook_thread = None
+_hook_thread_id = 0
+_hook_stop = threading.Event()
+
+WH_KEYBOARD_LL = 13
+WM_KEYDOWN = 0x0100
+WM_SYSKEYDOWN = 0x0104
+WM_QUIT = 0x0012
+VK_LWIN = 0x5B
+VK_RWIN = 0x5C
+HC_ACTION = 0
+
+class KBDLLHOOKSTRUCT(ctypes.Structure):
+    _fields_ = [
+        ("vkCode", ctypes.wintypes.DWORD),
+        ("scanCode", ctypes.wintypes.DWORD),
+        ("flags", ctypes.wintypes.DWORD),
+        ("time", ctypes.wintypes.DWORD),
+        ("dwExtraInfo", ctypes.wintypes.ULONG_PTR),
+    ]
 
 user32 = None
+kernel32 = None
 try:
     user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
 except Exception:
     user32 = None
+    kernel32 = None
 
 
 def open_explorer(path=None):
@@ -102,6 +129,73 @@ def _find_taskbar_handle():
     return user32.FindWindowW("Shell_TrayWnd", None)
 
 
+HOOKPROC = ctypes.WINFUNCTYPE(ctypes.wintypes.LRESULT, ctypes.c_int, ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM)
+
+
+def _keyboard_proc(nCode, wParam, lParam):
+    if nCode == HC_ACTION and wParam in (WM_KEYDOWN, WM_SYSKEYDOWN):
+        kb = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+        if kb.vkCode in (VK_LWIN, VK_RWIN):
+            return 1
+    return user32.CallNextHookEx(_keyboard_hook, nCode, wParam, lParam)
+
+
+_keyboard_proc_ref = HOOKPROC(_keyboard_proc)
+
+
+def _hook_loop():
+    global _keyboard_hook, _hook_thread_id
+    if user32 is None or kernel32 is None:
+        return
+
+    _hook_thread_id = kernel32.GetCurrentThreadId()
+    _keyboard_hook = user32.SetWindowsHookExW(WH_KEYBOARD_LL, _keyboard_proc_ref, kernel32.GetModuleHandleW(None), 0)
+    if not _keyboard_hook:
+        _hook_thread_id = 0
+        return
+
+    msg = ctypes.wintypes.MSG()
+    try:
+        while not _hook_stop.is_set():
+            rc = user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
+            if rc == 0 or rc == -1:
+                break
+            user32.TranslateMessage(ctypes.byref(msg))
+            user32.DispatchMessageW(ctypes.byref(msg))
+    finally:
+        try:
+            user32.UnhookWindowsHookEx(_keyboard_hook)
+        except Exception:
+            pass
+        _keyboard_hook = None
+        _hook_thread_id = 0
+
+
+def _start_windows_key_block():
+    global _windows_key_blocked, _hook_thread
+    if _windows_key_blocked:
+        return
+    if user32 is None or kernel32 is None:
+        raise RuntimeError("Windows user32 API is unavailable")
+    _hook_stop.clear()
+    _hook_thread = threading.Thread(target=_hook_loop, daemon=True)
+    _hook_thread.start()
+    _windows_key_blocked = True
+
+
+def _stop_windows_key_block():
+    global _windows_key_blocked
+    if not _windows_key_blocked:
+        return
+    _hook_stop.set()
+    if kernel32 is not None and _hook_thread_id:
+        try:
+            kernel32.PostThreadMessageW(_hook_thread_id, WM_QUIT, 0, 0)
+        except Exception:
+            pass
+    _windows_key_blocked = False
+
+
 def taskbar_hidden():
     handle = _find_taskbar_handle()
     if not handle:
@@ -115,6 +209,7 @@ def taskbar_show():
     if not handle:
         raise RuntimeError("taskbar window not found")
     user32.ShowWindow(handle, 5)
+    _stop_windows_key_block()
     _taskbar_hidden = False
     return "taskbar shown"
 
@@ -125,6 +220,7 @@ def taskbar_hide():
     if not handle:
         raise RuntimeError("taskbar window not found")
     user32.ShowWindow(handle, 0)
+    _start_windows_key_block()
     _taskbar_hidden = True
     return "taskbar hidden"
 
@@ -164,8 +260,6 @@ def handle_message(msg):
         run_exec(" ".join(args))
     elif cmd == "execwait":
         run_execwait(" ".join(args))
-    elif cmd == "install":
-        send("Already Installed")
     elif cmd == "download":
         if bridgefs and hasattr(bridgefs, "download"):
             try:
