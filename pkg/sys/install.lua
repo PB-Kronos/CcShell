@@ -1,23 +1,9 @@
-local function download(src, dst)
-    shell.run("wget https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/" .. src .. " " .. dst)
-end
-
-local function install_file(cache_path, target_path, source_path)
-    local cache_dir = fs.getDir(cache_path)
-    if cache_dir and cache_dir ~= "" and not fs.exists(cache_dir) then
-        fs.makeDir(cache_dir)
-    end
-
-    download(source_path, cache_path)
-    if not fs.exists(cache_path) then
-        error("download failed for " .. source_path, 0)
-    end
-
+local function install_file(target_path, source_path)
     if fs.exists(target_path) then
         error("module " .. target_path .. " already exists", 0)
     end
 
-    fs.copy(cache_path, target_path)
+    shell.run("wget https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/" .. source_path .. " " .. target_path)
 
     if not fs.exists(target_path) then
         error("install failed, module " .. target_path .. " could not be verified", 0)
@@ -49,60 +35,8 @@ local function append_unique_line(path, line)
     return true
 end
 
-local function ensure_install_stub()
-    local stub = "/var/.install.py"
-    local dir = fs.getDir(stub)
-    if dir and dir ~= "" and not fs.exists(dir) then
-        fs.makeDir(dir)
-    end
-    download("source/var/.install.py", stub)
-    if not fs.exists(stub) then
-        error("failed to stage installer stub", 0)
-    end
-    return stub
-end
-
-local function bridge_installed()
-    return fs.exists("/python/execbridge.py")
-end
-
-local function send_install_message()
-    local response = nil
-    local posted = false
-
-    for _ = 1, 10 do
-        local h = http.post("http://127.0.0.1:8000/output", "install")
-        if h then
-            h.close()
-            posted = true
-            break
-        end
-        sleep(0.25)
-    end
-
-    if not posted then
-        print("Bridge installer not reachable; skipping bootstrap handshake")
-        return nil
-    end
-
-    for _ = 1, 20 do
-        sleep(0.25)
-        local r = http.get("http://127.0.0.1:8000/input")
-        if r then
-            local data = r.readAll()
-            r.close()
-            if data and data ~= "" then
-                response = data
-                break
-            end
-        end
-    end
-
-    return response
-end
-
 local function install()
-    install_file("/var/cache/sys.lua", "/bin/sys.lua", "pkg/sys/sys.lua")
+    install_file("/bin/sys.lua", "pkg/sys/sys.lua")
 end
 
 local function ensure_startup_hook()
@@ -118,23 +52,7 @@ if downloader then
 elseif downloader == false then
     install()
     ensure_startup_hook()
-    if bridge_installed() then
-        print("Bridge already installed; skipping bootstrap")
-    else
-        local stub = ensure_install_stub()
-        local response = send_install_message()
-        if response == "ok" then
-            if fs.exists(stub) then
-                fs.delete(stub)
-            end
-            print("Bridge installer completed")
-        else
-            if fs.exists(stub) then
-                fs.delete(stub)
-            end
-            print("Bridge installer did not confirm completion:", response or "no response")
-        end
-    end
+    print("Sys installed")
 else
     error("download is nil")
 end

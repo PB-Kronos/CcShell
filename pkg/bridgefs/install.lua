@@ -1,3 +1,10 @@
+local function ensure_file(path, label)
+    if not fs.exists(path) then
+        error(label .. " missing: " .. path .. " (install/update python first)", 0)
+    end
+    print("Verified:", path)
+end
+
 local function install_file(source_path, target_path, label)
     if not sys or not sys.fs or not sys.fs.download then
         error("sys bridge is required before installing bridgefs", 0)
@@ -10,5 +17,5 @@ local function install_file(source_path, target_path, label)
     print("Installed:", target_path)
 end
 
-install_file("source/py/bridgefs.py", "/python/bridgefs.py", "bridgefs")
+ensure_file("/python/bridgefs.py", "bridgefs.py")
 install_file("pkg/bridgefs/file.lua", "/bin/file.lua", "file.lua")

@@ -15,7 +15,8 @@ def resolve_repo_root() -> Path:
 
 REPO_ROOT = resolve_repo_root()
 PY_ROOT = REPO_ROOT / "python"
-EXECBRIDGE_URL = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/source/py/execbridge.py"
+SOURCE_PY_ROOT = REPO_ROOT / "source" / "py"
+GITHUB_RAW_BASE = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main"
 pending = None
 
 
@@ -24,20 +25,32 @@ def send(msg: str):
     pending = msg
 
 
+def _repo_raw_url(path: str) -> str:
+    return f"{GITHUB_RAW_BASE}/{path.lstrip('/')}"
+
+
+def _install_python_tree():
+    print("[INSTALL] preparing python tree")
+    print(f"[INSTALL] repo root: {REPO_ROOT}")
+    print(f"[INSTALL] python root: {PY_ROOT}")
+    PY_ROOT.mkdir(parents=True, exist_ok=True)
+
+    for source_file in sorted(SOURCE_PY_ROOT.glob("*.py")):
+        target = PY_ROOT / source_file.name
+        print(f"[INSTALL] downloading {source_file.name}")
+        with urllib.request.urlopen(_repo_raw_url(f"source/py/{source_file.name}")) as response:
+            target.write_bytes(response.read())
+
+    print("[INSTALL] python tree installed")
+
+
 def receive(msg: str):
     parts = msg.strip().split()
     if not parts:
         return
 
     if parts[0] == "install":
-        print("[INSTALL] preparing python bridge")
-        print(f"[INSTALL] repo root: {REPO_ROOT}")
-        print(f"[INSTALL] python root: {PY_ROOT}")
-        PY_ROOT.mkdir(parents=True, exist_ok=True)
-        print("[INSTALL] downloading execbridge.py")
-        with urllib.request.urlopen(EXECBRIDGE_URL) as response:
-            (PY_ROOT / "execbridge.py").write_bytes(response.read())
-        print("[INSTALL] bridge installed")
+        _install_python_tree()
         send("ok")
     else:
         send("unknown command")
