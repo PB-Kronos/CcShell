@@ -5,7 +5,15 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+def resolve_repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if parent.name == "computer":
+            return parent.parent
+    return current.parents[3]
+
+
+REPO_ROOT = resolve_repo_root()
 PY_ROOT = REPO_ROOT / "python"
 EXECBRIDGE_URL = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/source/py/execbridge.py"
 pending = None
@@ -23,6 +31,8 @@ def receive(msg: str):
 
     if parts[0] == "install":
         print("[INSTALL] preparing python bridge")
+        print(f"[INSTALL] repo root: {REPO_ROOT}")
+        print(f"[INSTALL] python root: {PY_ROOT}")
         PY_ROOT.mkdir(parents=True, exist_ok=True)
         print("[INSTALL] downloading execbridge.py")
         with urllib.request.urlopen(EXECBRIDGE_URL) as response:
