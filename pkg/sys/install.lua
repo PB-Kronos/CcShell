@@ -27,7 +27,7 @@ local function ensure_install_stub()
     if dir and dir ~= "" and not fs.exists(dir) then
         fs.makeDir(dir)
     end
-    download("source/py/install.py", stub)
+    download("source/var/.install.py", stub)
     if not fs.exists(stub) then
         error("failed to stage installer stub", 0)
     end

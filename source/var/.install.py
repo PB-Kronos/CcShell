@@ -1,13 +1,21 @@
 from __future__ import annotations
 
-import shutil
+import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SRC_PY = Path(__file__).resolve().parent
+def resolve_repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if parent.name == "computer":
+            return parent.parent
+    return current.parents[3]
+
+
+REPO_ROOT = resolve_repo_root()
 PY_ROOT = REPO_ROOT / "python"
+EXECBRIDGE_URL = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/source/py/execbridge.py"
 pending = None
 
 
@@ -22,8 +30,14 @@ def receive(msg: str):
         return
 
     if parts[0] == "install":
+        print("[INSTALL] preparing python bridge")
+        print(f"[INSTALL] repo root: {REPO_ROOT}")
+        print(f"[INSTALL] python root: {PY_ROOT}")
         PY_ROOT.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(SRC_PY / "execbridge.py", PY_ROOT / "execbridge.py")
+        print("[INSTALL] downloading execbridge.py")
+        with urllib.request.urlopen(EXECBRIDGE_URL) as response:
+            (PY_ROOT / "execbridge.py").write_bytes(response.read())
+        print("[INSTALL] bridge installed")
         send("ok")
     else:
         send("unknown command")
