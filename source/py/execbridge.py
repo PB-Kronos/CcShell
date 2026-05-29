@@ -5,6 +5,7 @@ import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+import ctypes
 
 
 HERE = Path(__file__).resolve().parent
@@ -17,6 +18,13 @@ except ModuleNotFoundError:
 
 pending = None
 CRAFTOS_ROOT = Path(os.path.expandvars(r"%APPDATA%")) / "CraftOS-PC"
+_taskbar_hidden = False
+
+user32 = None
+try:
+    user32 = ctypes.windll.user32
+except Exception:
+    user32 = None
 
 
 def open_explorer(path=None):
@@ -35,9 +43,9 @@ def restart_windows():
 
 
 def lock_windows():
-    import ctypes
-
-    ctypes.windll.user32.LockWorkStation()
+    if user32 is None:
+        raise RuntimeError("Windows user32 API is unavailable")
+    user32.LockWorkStation()
 
 
 def run_program(path):
@@ -88,6 +96,45 @@ def repo_download(src: str, dst: str):
         target.write_bytes(response.read())
 
 
+def _find_taskbar_handle():
+    if user32 is None:
+        return None
+    return user32.FindWindowW("Shell_TrayWnd", None)
+
+
+def taskbar_hidden():
+    handle = _find_taskbar_handle()
+    if not handle:
+        return False
+    return not bool(user32.IsWindowVisible(handle))
+
+
+def taskbar_show():
+    global _taskbar_hidden
+    handle = _find_taskbar_handle()
+    if not handle:
+        raise RuntimeError("taskbar window not found")
+    user32.ShowWindow(handle, 5)
+    _taskbar_hidden = False
+    return "taskbar shown"
+
+
+def taskbar_hide():
+    global _taskbar_hidden
+    handle = _find_taskbar_handle()
+    if not handle:
+        raise RuntimeError("taskbar window not found")
+    user32.ShowWindow(handle, 0)
+    _taskbar_hidden = True
+    return "taskbar hidden"
+
+
+def taskbar_toggle():
+    if taskbar_hidden():
+        return taskbar_show()
+    return taskbar_hide()
+
+
 def handle_message(msg):
     print("[FROM CC]", msg)
     parts = msg.strip().split()
@@ -130,6 +177,21 @@ def handle_message(msg):
                 send("ok")
             except Exception as e:
                 send(f"download error: {str(e)}")
+    elif cmd == "taskbar":
+        try:
+            action = args[0] if args else "status"
+            if action == "hide":
+                send(taskbar_hide())
+            elif action == "show":
+                send(taskbar_show())
+            elif action == "toggle":
+                send(taskbar_toggle())
+            elif action == "status":
+                send("hidden" if taskbar_hidden() else "visible")
+            else:
+                send("unknown taskbar action: " + action)
+        except Exception as e:
+            send(f"taskbar error: {str(e)}")
     else:
         send("unknown command: " + cmd)
 

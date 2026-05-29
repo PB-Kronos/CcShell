@@ -2,7 +2,7 @@ local args = { ... }
 
 local function ensure_sys()
     if not sys or not sys.fs then
-        error("execute.lua wrapper is not loaded; call dofile('/bin/execute.lua') first", 0)
+        error("sys.lua wrapper is not loaded; call dofile('/bin/sys.lua') first", 0)
     end
 end
 
