@@ -3,7 +3,7 @@ for _,f in ipairs(textutils.unserializeJSON(http.get("https://api.github.com/rep
         print("Downloading:", f.path)
         local h = http.get("https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/"..f.path)
         if h then
-            local o = "/disk/"..f.path:sub(8)
+            local o = "/"..f.path:sub(8)
             local dir = fs.getDir(o)
 
             if dir ~= "" and not fs.exists(dir) then
