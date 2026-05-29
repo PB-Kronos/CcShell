@@ -38,6 +38,37 @@ local function saveDB(db)
     f.close()
 end
 
+local function clearCache()
+    local cache_root = "/var/cache"
+    if not fs.exists(cache_root) then
+        return 0
+    end
+
+    local removed = 0
+    local function removeTree(path)
+        if not fs.exists(path) then
+            return
+        end
+
+        if fs.isDir(path) then
+            for _, name in ipairs(fs.list(path)) do
+                removeTree(fs.combine(path, name))
+            end
+            fs.delete(path)
+        else
+            fs.delete(path)
+        end
+        removed = removed + 1
+    end
+
+    for _, name in ipairs(fs.list(cache_root)) do
+        removeTree(fs.combine(cache_root, name))
+    end
+
+    print("Cleared cache:", cache_root)
+    return removed
+end
+
 local function isInstalled(pkg, db)
     db = db or loadDB()
     return db[pkg] ~= nil
@@ -231,6 +262,8 @@ end
 local function upgrade(pkg, ...)
     local path = pkg .. "/upgrade.lua"
 
+    clearCache()
+
     local code = fetch(REPO .. "/" .. path)
     if code then
         print("Running upgrade script for:", pkg)
@@ -317,6 +350,7 @@ elseif cmd == "-U" then
     end
 
 elseif cmd == "-Syu" then
+    clearCache()
     syncAll()
 
 elseif cmd == "-Q" then
