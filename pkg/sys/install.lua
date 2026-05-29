@@ -22,7 +22,7 @@ local function install_file(cache_path, target_path, source_path)
 end
 
 local function ensure_install_stub()
-    local stub = "/computer/0/var/.install.py"
+    local stub = "/var/.install.py"
     local dir = fs.getDir(stub)
     if dir and dir ~= "" and not fs.exists(dir) then
         fs.makeDir(dir)
