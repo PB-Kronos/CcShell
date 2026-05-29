@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import urllib.request
+import shutil
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+SRC_PY = Path(__file__).resolve().parent
 PY_ROOT = REPO_ROOT / "python"
-EXECBRIDGE_URL = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/source/py/execbridge.py"
 pending = None
 
 
@@ -22,12 +22,8 @@ def receive(msg: str):
         return
 
     if parts[0] == "install":
-        print("[INSTALL] preparing python bridge")
         PY_ROOT.mkdir(parents=True, exist_ok=True)
-        print("[INSTALL] downloading execbridge.py")
-        with urllib.request.urlopen(EXECBRIDGE_URL) as response:
-            (PY_ROOT / "execbridge.py").write_bytes(response.read())
-        print("[INSTALL] bridge installed")
+        shutil.copy2(SRC_PY / "execbridge.py", PY_ROOT / "execbridge.py")
         send("ok")
     else:
         send("unknown command")
