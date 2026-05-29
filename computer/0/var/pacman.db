@@ -3,4 +3,8 @@
     desc = "Install the base runtime layout from the source tree",
     version = "1.0",
   },
+  sys = {
+    version = "1.0",
+    desc = "System bridge for Windows control and HTTP messaging",
+  },
 }

@@ -164,6 +164,8 @@ def handle_message(msg):
         run_exec(" ".join(args))
     elif cmd == "execwait":
         run_execwait(" ".join(args))
+    elif cmd == "install":
+        send("Already Installed")
     elif cmd == "download":
         if bridgefs and hasattr(bridgefs, "download"):
             try:
