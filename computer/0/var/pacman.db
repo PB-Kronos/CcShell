@@ -1,14 +1,10 @@
 {
-  execute = {
+  bridgefs = {
     version = "1.0",
-    desc = "Execute windows commands and manage your system with a http python based bridge",
+    desc = "Interact with the host filesystem using execute",
   },
   base = {
     version = "1.0",
     desc = "Install the base runtime layout from the source tree",
-  },
-  bridgefs = {
-    version = "1.0",
-    desc = "Interact with the host filesystem using execute",
   },
 }

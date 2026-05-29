@@ -291,4 +291,4 @@ if tUserStartups then
 end
 
 
-if fs.exists("/bin/execute.lua") then dofile("/bin/execute.lua") end
+
