@@ -1,6 +1,0 @@
-{
-  base = {
-    desc = "Install the base runtime layout from the source tree",
-    version = "1.0",
-  },
-}

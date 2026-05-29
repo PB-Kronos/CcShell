@@ -1,10 +1,6 @@
 {
-  bridgefs = {
-    version = "1.0",
-    desc = "Interact with the host filesystem using execute",
-  },
   base = {
-    version = "1.0",
     desc = "Install the base runtime layout from the source tree",
+    version = "1.0",
   },
 }
