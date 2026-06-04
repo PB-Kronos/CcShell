@@ -410,6 +410,10 @@ local function syncAll()
     end
 end
 
+local function isFlag(arg)
+    return type(arg) == "string" and arg:sub(1, 2) == "--"
+end
+
 -- =========================
 -- CLI
 -- =========================
@@ -419,8 +423,21 @@ local cmd = args[1]
 
 if cmd == "-S" or cmd == "-D" then
     if cmd == "-D" then download = true else download = false end
+    local baseFlags = {}
     for i = 2, #args do
-        install(args[i])
+        if isFlag(args[i]) then
+            baseFlags[#baseFlags + 1] = args[i]
+        end
+    end
+
+    for i = 2, #args do
+        if not isFlag(args[i]) then
+            if args[i] == "base" then
+                install(args[i], nil, table.unpack(baseFlags))
+            else
+                install(args[i])
+            end
+        end
     end
 elseif cmd == "-R" then
     for i = 2, #args do
