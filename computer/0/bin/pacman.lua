@@ -477,3 +477,4 @@ else
     print("-Q <pkg>          query version")
     print("-L                list installed")
 end
+

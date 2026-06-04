@@ -50,7 +50,7 @@ if not fs.exists(cfgDir.."explorer.cfg") then
 	settings.set("minexp.disable_hotkeys", false)
 	settings.set("minexp.recycle_directory", recycleDir)
 	settings.set("minexp.recycle_on_leave", false)
-	settings.save("usr/minexp/explorer.cfg")
+	settings.save("var/minexp/explorer.cfg")
 	settings.clear()
 end
 if not fs.exists(cfgDir.."colors.cfg") then
@@ -58,14 +58,14 @@ if not fs.exists(cfgDir.."colors.cfg") then
 	settings.set("minexp.colors.fg", colors.white)
 	settings.set("minexp.colors.select", colors.blue)
 	settings.set("minexp.colors.active", colors.gray)
-	settings.save("usr/minexp/colors.cfg")
+	settings.save("var/minexp/colors.cfg")
 	settings.clear()
 end
 if not fs.exists(cfgDir.."programs.cfg") then
 	settings.set("minexp.default_program", "edit")
 	settings.set("minexp.programs.nft", "paint")
 	settings.set("minexp.programs.nfp", "paint")
-	settings.save("usr/minexp/programs.cfg")
+	settings.save("var/minexp/programs.cfg")
 	settings.clear()
 end
 settings.load(cfgDir.."explorer.cfg")
