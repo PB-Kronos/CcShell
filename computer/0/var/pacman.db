@@ -3,6 +3,10 @@
     version = "1.0",
     desc = "Install the base runtime layout from the source tree",
   },
+  http = {
+    version = "1.0",
+    desc = "Install the http and rednet program trees",
+  },
   sys = {
     version = "1.0",
     desc = "System bridge for Windows control and HTTP messaging",
