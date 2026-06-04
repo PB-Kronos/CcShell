@@ -1,6 +1,0 @@
-{
-  safe_rom = false,
-  [ "shell.autocomplete_hidden" ] = true,
-  [ "list.show_hidden" ] = true,
-  [ "motd.enable" ] = false,
-}
