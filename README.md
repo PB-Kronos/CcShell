@@ -40,7 +40,24 @@ The repo is split into:
 - `python/` - host-side Python scripts used by the bridge
 - `computer/` - live per-computer runtime data used for testing
 
----
+### Not an OS
+
+This project is not strictly a full operating system in the traditional sense.  
+It is better described as an addon layer for CraftOS-PC that makes the shell, package flow, and host integration behave more like a lightweight OS environment.
+
+The goal is to extend CraftOS-PC with:
+
+- a more structured boot process
+- package-managed runtime components
+- host-side Python helpers
+- Windows integration where it is useful
+- a cleaner, Linux-like workflow for shell users
+
+So while it behaves like an OS in practice, the actual model is:
+
+- CraftOS-PC remains the base
+- this repository adds the runtime layer on top
+- packages and helpers extend that layer over time
 
 ## Features
 
@@ -157,24 +174,6 @@ The package tree is meant to stay small and explicit:
 
 ---
 
-## What This Is
-
-This project is not strictly a full operating system in the traditional sense.  
-It is better described as an addon layer for CraftOS-PC that makes the shell, package flow, and host integration behave more like a lightweight OS environment.
-
-The goal is to extend CraftOS-PC with:
-
-- a more structured boot process
-- package-managed runtime components
-- host-side Python helpers
-- Windows integration where it is useful
-- a cleaner, Linux-like workflow for shell users
-
-So while it behaves like an OS in practice, the actual model is:
-
-- CraftOS-PC remains the base
-- this repository adds the runtime layer on top
-- packages and helpers extend that layer over time
 
 ---
 
