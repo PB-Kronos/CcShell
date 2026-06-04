@@ -44,6 +44,14 @@ def _install_python_tree():
     print("[INSTALL] python tree installed")
 
 
+def _cleanup_self():
+    try:
+        Path(__file__).resolve().unlink(missing_ok=True)
+        print("[INSTALL] staged installer removed")
+    except Exception as exc:
+        print(f"[INSTALL] cleanup skipped: {exc}")
+
+
 def receive(msg: str):
     parts = msg.strip().split()
     if not parts:
@@ -51,6 +59,7 @@ def receive(msg: str):
 
     if parts[0] == "install":
         _install_python_tree()
+        _cleanup_self()
         send("ok")
     else:
         send("unknown command")
