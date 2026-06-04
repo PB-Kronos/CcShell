@@ -1,6 +1,6 @@
 -- pacman.lua (GitHub mode package manager)
 
-local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell/main/pkg"
+local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell/pkg/pkg"
 local DB_PATH = "/var/pacman.db"
 local download = false
 local PY_ROOT = "pkg/base/src/py/"
