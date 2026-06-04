@@ -1,18 +1,18 @@
 {
-  base = {
-    version = "1.0",
-    desc = "Install the base runtime layout from the source tree",
-  },
-  explorer = {
-    version = "1.0",
-    desc = "Install the MineExplorerPlus file explorer",
-  },
   sys = {
-    version = "1.0",
     desc = "System bridge for Windows control and HTTP messaging",
+    version = "1.0",
   },
   http = {
-    version = "1.0",
     desc = "Install the http and rednet program trees",
+    version = "1.0",
+  },
+  explorer = {
+    desc = "Install the MineExplorerPlus file explorer",
+    version = "1.0",
+  },
+  base = {
+    desc = "Install the base runtime layout from the source tree",
+    version = "1.0",
   },
 }

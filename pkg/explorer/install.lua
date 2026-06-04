@@ -1,4 +1,4 @@
-local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell/main"
+local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell/pkg"
 local SOURCE_ROOT = "pkg/explorer/"
 local MINEXP_ROOT = SOURCE_ROOT .. "minexp/"
 
