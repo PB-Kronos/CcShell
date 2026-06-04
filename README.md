@@ -1,17 +1,17 @@
-# CcShell-runtime
+# CcShell
 
 <p align="center">
-  <a href="https://github.com/PB-Kronos/CcShell-runtime/stargazers">
-    <img src="https://img.shields.io/github/stars/PB-Kronos/CcShell-runtime?style=for-the-badge&color=gold" alt="Stars">
+  <a href="https://github.com/PB-Kronos/CcShell/stargazers">
+    <img src="https://img.shields.io/github/stars/PB-Kronos/CcShell?style=for-the-badge&color=gold" alt="Stars">
   </a>
-  <a href="https://github.com/PB-Kronos/CcShell-runtime/forks">
-    <img src="https://img.shields.io/github/forks/PB-Kronos/CcShell-runtime?style=for-the-badge&color=blue" alt="Forks">
+  <a href="https://github.com/PB-Kronos/CcShell/forks">
+    <img src="https://img.shields.io/github/forks/PB-Kronos/CcShell?style=for-the-badge&color=blue" alt="Forks">
   </a>
-  <a href="https://github.com/PB-Kronos/CcShell-runtime/watchers">
-    <img src="https://img.shields.io/github/watchers/PB-Kronos/CcShell-runtime?style=for-the-badge&color=purple" alt="Watchers">
+  <a href="https://github.com/PB-Kronos/CcShell/watchers">
+    <img src="https://img.shields.io/github/watchers/PB-Kronos/CcShell?style=for-the-badge&color=purple" alt="Watchers">
   </a>
-  <a href="https://github.com/PB-Kronos/CcShell-runtime/issues">
-    <img src="https://img.shields.io/github/issues/PB-Kronos/CcShell-runtime?style=for-the-badge&color=red" alt="Open Issues">
+  <a href="https://github.com/PB-Kronos/CcShell/issues">
+    <img src="https://img.shields.io/github/issues/PB-Kronos/CcShell?style=for-the-badge&color=red" alt="Open Issues">
   </a>
 </p>
 
@@ -23,7 +23,7 @@
 
 ## What this is
 
-`CcShell-runtime` is a custom runtime and package layout built on top of CraftOS-PC.  
+`CcShell` is a custom runtime and package layout built on top of CraftOS-PC.  
 It is designed to make the CraftOS shell feel more like a small operating system:
 
 - boot-time shell customization

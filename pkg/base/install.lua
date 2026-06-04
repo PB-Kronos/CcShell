@@ -2,7 +2,7 @@ local function download(src, dst)
     if fs.exists(dst) then
         fs.delete(dst)
     end
-    shell.run("wget https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/" .. src .. " " .. dst)
+    shell.run("wget https://raw.githubusercontent.com/PB-Kronos/CcShell/main/" .. src .. " " .. dst)
 end
 
 local SOURCE_ROOT = "pkg/base/src/"
@@ -64,10 +64,10 @@ local function shouldInstallPath(path)
     return true
 end
 
-for _,f in ipairs(textutils.unserializeJSON(http.get("https://api.github.com/repos/PB-Kronos/CcShell-runtime/git/trees/main?recursive=1").readAll()).tree) do
+for _,f in ipairs(textutils.unserializeJSON(http.get("https://api.github.com/repos/PB-Kronos/CcShell/git/trees/main?recursive=1").readAll()).tree) do
     if f.type == "blob" and startsWith(f.path, SOURCE_ROOT) and shouldInstallPath(f.path) then
         print("Downloading:", f.path)
-        local h = http.get("https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/"..f.path)
+        local h = http.get("https://raw.githubusercontent.com/PB-Kronos/CcShell/main/"..f.path)
         if h then
             local o
             if startsWith(f.path, PY_ROOT) then
