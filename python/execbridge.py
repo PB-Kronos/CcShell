@@ -35,13 +35,18 @@ VK_LWIN = 0x5B
 VK_RWIN = 0x5C
 HC_ACTION = 0
 
+ULONG_PTR = getattr(ctypes.wintypes, "ULONG_PTR", ctypes.c_void_p)
+LRESULT = getattr(ctypes.wintypes, "LRESULT", ctypes.c_long)
+WPARAM = getattr(ctypes.wintypes, "WPARAM", ctypes.c_size_t)
+LPARAM = getattr(ctypes.wintypes, "LPARAM", ctypes.c_ssize_t)
+
 class KBDLLHOOKSTRUCT(ctypes.Structure):
     _fields_ = [
         ("vkCode", ctypes.wintypes.DWORD),
         ("scanCode", ctypes.wintypes.DWORD),
         ("flags", ctypes.wintypes.DWORD),
         ("time", ctypes.wintypes.DWORD),
-        ("dwExtraInfo", ctypes.wintypes.ULONG_PTR),
+        ("dwExtraInfo", ULONG_PTR),
     ]
 
 user32 = None
@@ -129,7 +134,7 @@ def _find_taskbar_handle():
     return user32.FindWindowW("Shell_TrayWnd", None)
 
 
-HOOKPROC = ctypes.WINFUNCTYPE(ctypes.wintypes.LRESULT, ctypes.c_int, ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM)
+HOOKPROC = ctypes.WINFUNCTYPE(LRESULT, ctypes.c_int, WPARAM, LPARAM)
 
 
 def _keyboard_proc(nCode, wParam, lParam):
