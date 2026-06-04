@@ -8,12 +8,6 @@ if exist "%ROOT%\python" (
     )
 )
 
-for /d %%C in ("%ROOT%\computer\*") do (
-    if exist "%%~fC\var\.install.py" (
-        start "" /min %PYTHON% "%%~fC\var\.install.py"
-    )
-)
-
 start "" "C:\Program Files\CraftOS-PC\CraftOS-PC.exe"
 
 exit /b
