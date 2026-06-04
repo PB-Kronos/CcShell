@@ -80,27 +80,21 @@ So while it behaves like an OS in practice, the actual model is:
 
 ### Requirements
 
-- CraftOS-PC on Windows
 - Python installed on the host machine
-- access to this repository or a clone of it
 
 ### Recommended setup
 
-1. Clone this repository into your CraftOS-PC data folder.
-2. Make sure the `source/` tree is the install source for `base`.
-3. Install `base` through your package flow.
-4. Install `sys` and `bridgefs` if you want the bridge features.
+1. Download and install the latest release.
+2. Run the program CraftOS-PC startup
+3. Install `base` through your package flow.(optional)
+4. Install `sys` and `bridgefs` if you want the bridge features.(optional)
 
 ### Base install
 
 The base package copies the runtime layout from the source tree and installs the Python bridge files into the host `python/` directory.
-
-Example:
-
 ```text
 pacman -S base
 ```
-
 Optional program trees can be forced with flags:
 
 ```text
