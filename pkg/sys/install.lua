@@ -3,7 +3,7 @@ local function install_file(target_path, source_path)
         error("module " .. target_path .. " already exists", 0)
     end
 
-    shell.run("wget https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/" .. source_path .. " " .. target_path)
+    shell.run("wget https://raw.githubusercontent.com/PB-Kronos/CcShell/main/" .. source_path .. " " .. target_path)
 
     if not fs.exists(target_path) then
         error("install failed, module " .. target_path .. " could not be verified", 0)
@@ -48,7 +48,7 @@ local function ensure_startup_hook()
 end
 
 if downloader then
-    shell.run("wget https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/pkg/sys/sys.lua /home/download/sys.lua")
+    shell.run("wget https://raw.githubusercontent.com/PB-Kronos/CcShell/main/pkg/sys/sys.lua /home/download/sys.lua")
 elseif downloader == false then
     install()
     ensure_startup_hook()
