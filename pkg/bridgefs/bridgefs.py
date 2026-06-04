@@ -8,7 +8,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CRAFTOS_ROOT = Path(os.path.expandvars(r"%APPDATA%")) / "CraftOS-PC"
-GITHUB_RAW_BASE = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main"
+GITHUB_RAW_BASE = "https://raw.githubusercontent.com/PB-Kronos/CcShell/main"
 
 
 def _normalize(path: str) -> str:
