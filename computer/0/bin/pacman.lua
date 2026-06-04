@@ -3,6 +3,7 @@
 local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/pkg"
 local DB_PATH = "/var/pacman.db"
 local download = false
+local PY_ROOT = "pkg/base/src/py/"
 
 -- =========================
 -- Utilities
@@ -113,8 +114,8 @@ local function installPythonTree()
     end
 
     for _, f in ipairs(parsed.tree) do
-        if f.type == "blob" and f.path:sub(1,10) == "source/py/" then
-            local rel = f.path:sub(11)
+        if f.type == "blob" and f.path:sub(1, #PY_ROOT) == PY_ROOT then
+            local rel = f.path:sub(#PY_ROOT + 1)
             local target = "/python/" .. rel
             print("Downloading python file:", f.path)
             sys.fs.download(f.path, target)
@@ -476,3 +477,4 @@ else
     print("-Q <pkg>          query version")
     print("-L                list installed")
 end
+

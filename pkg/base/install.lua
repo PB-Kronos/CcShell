@@ -5,6 +5,10 @@ local function download(src, dst)
     shell.run("wget https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/" .. src .. " " .. dst)
 end
 
+local SOURCE_ROOT = "pkg/base/src/"
+local PY_ROOT = SOURCE_ROOT .. "py/"
+local PROGRAMS_ROOT = SOURCE_ROOT .. "bin/rom/programs/"
+
 local rawArgs = {...}
 local flags = {}
 for _, arg in ipairs(rawArgs) do
@@ -26,38 +30,38 @@ local function startsWith(value, prefix)
 end
 
 local function shouldInstallPath(path)
-    if startsWith(path, "source/py/") then
+    if startsWith(path, PY_ROOT) then
         return false
     end
 
-    if startsWith(path, "source/bin/rom/programs/http/wget.lua") then
+    if path == PROGRAMS_ROOT .. "http/wget.lua" then
         return true
     end
 
-    if startsWith(path, "source/bin/rom/programs/http/") then
+    if startsWith(path, PROGRAMS_ROOT .. "http/") then
         if path:sub(-8) == "wget.lua" then
             return true
         end
         return want("http", false)
     end
 
-    if startsWith(path, "source/bin/rom/programs/rednet/") then
+    if startsWith(path, PROGRAMS_ROOT .. "rednet/") then
         return want("http", false)
     end
 
-    if startsWith(path, "source/bin/rom/programs/fun/") then
+    if startsWith(path, PROGRAMS_ROOT .. "fun/") then
         return want("fun", false)
     end
 
-    if startsWith(path, "source/bin/rom/programs/advanced/") then
+    if startsWith(path, PROGRAMS_ROOT .. "advanced/") then
         return want("advanced", autoAdvanced)
     end
 
-    if startsWith(path, "source/bin/rom/programs/turtle/") then
+    if startsWith(path, PROGRAMS_ROOT .. "turtle/") then
         return want("turtle", autoTurtle)
     end
 
-    if startsWith(path, "source/bin/rom/programs/pocket/") then
+    if startsWith(path, PROGRAMS_ROOT .. "pocket/") then
         return want("pocket", autoPocket)
     end
 
@@ -66,8 +70,8 @@ end
 
 local function installPythonFiles()
     for _, f in ipairs(textutils.unserializeJSON(http.get("https://api.github.com/repos/PB-Kronos/CcShell-runtime/git/trees/main?recursive=1").readAll()).tree) do
-        if f.type == "blob" and f.path:sub(1,10) == "source/py/" then
-            local target = "/python/" .. f.path:sub(11)
+        if f.type == "blob" and startsWith(f.path, PY_ROOT) then
+            local target = "/python/" .. f.path:sub(#PY_ROOT + 1)
             local dir = fs.getDir(target)
 
             if dir ~= "" and not fs.exists(dir) then
@@ -82,11 +86,11 @@ local function installPythonFiles()
 end
 
 for _,f in ipairs(textutils.unserializeJSON(http.get("https://api.github.com/repos/PB-Kronos/CcShell-runtime/git/trees/main?recursive=1").readAll()).tree) do
-    if f.type == "blob" and f.path:sub(1,7) == "source/" and shouldInstallPath(f.path) then
+    if f.type == "blob" and startsWith(f.path, SOURCE_ROOT) and shouldInstallPath(f.path) then
         print("Downloading:", f.path)
         local h = http.get("https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/"..f.path)
         if h then
-            local o = "/"..f.path:sub(8)
+            local o = "/" .. f.path:sub(#SOURCE_ROOT + 1)
             local dir = fs.getDir(o)
 
             if dir ~= "" and not fs.exists(dir) then
@@ -106,3 +110,4 @@ for _,f in ipairs(textutils.unserializeJSON(http.get("https://api.github.com/rep
 end
 
 installPythonFiles()
+
