@@ -122,7 +122,7 @@ def repo_download(src: str, dst: str):
     if not str(target).startswith(str(target_root)):
         raise ValueError("download destination must stay within CraftOS-PC")
 
-    url = src if src.startswith(("http://", "https://")) else f"https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/{src.lstrip('/')}"
+    url = src if src.startswith(("http://", "https://")) else f"https://raw.githubusercontent.com/PB-Kronos/CcShell/main/{src.lstrip('/')}"
     target.parent.mkdir(parents=True, exist_ok=True)
     with urllib.request.urlopen(url) as response:
         target.write_bytes(response.read())

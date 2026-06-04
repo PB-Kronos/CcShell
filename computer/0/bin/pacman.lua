@@ -1,6 +1,6 @@
 -- pacman.lua (GitHub mode package manager)
 
-local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell-runtime/main/pkg"
+local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell/main/pkg"
 local DB_PATH = "/var/pacman.db"
 local download = false
 local PY_ROOT = "pkg/base/src/py/"
@@ -103,7 +103,7 @@ local function installPythonTree()
         return false, err
     end
 
-    local tree = fetch("https://api.github.com/repos/PB-Kronos/CcShell-runtime/git/trees/main?recursive=1")
+    local tree = fetch("https://api.github.com/repos/PB-Kronos/CcShell/git/trees/main?recursive=1")
     if not tree then
         return false, "failed to fetch source tree"
     end
@@ -477,4 +477,3 @@ else
     print("-Q <pkg>          query version")
     print("-L                list installed")
 end
-
