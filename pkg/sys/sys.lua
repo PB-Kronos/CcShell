@@ -133,7 +133,10 @@ end
 function sys.taskbar_status()
   return sys.execute("taskbar status")
 end
-
+function sys.exit()
+  send("exit")
+  os.shutdown()
+end
 local function print_usage()
   print("sys commands:")
   print("  read <path>")

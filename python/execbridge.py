@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import time
 import os
 import subprocess
 import sys
@@ -247,6 +247,8 @@ def handle_message(msg):
 
     if cmd == "ping":
         send("pong")
+    elif cmd == "exit":
+        sys.exit()
     elif cmd == "print":
         send(" ".join(args))
     elif cmd == "explorer":
