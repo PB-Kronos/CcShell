@@ -3,7 +3,15 @@
 local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell/main/pkg"
 local DB_PATH = "/var/pacman.db"
 local download = false
-local PY_ROOT = "pkg/base/src/py/"
+local PY_ROOT = "python/"
+
+local function getPythonRoot()
+    local root = settings and settings.get and settings.get("python_path") or nil
+    if type(root) ~= "string" or root == "" then
+        return "/python"
+    end
+    return root
+end
 
 -- =========================
 -- Utilities
@@ -75,7 +83,7 @@ local function clearPythonTree()
         return false, "sys bridge is required to manage the python tree"
     end
 
-    local root = "/python"
+    local root = getPythonRoot()
     if not sys.fs.exists(root) then
         return true
     end
@@ -98,6 +106,7 @@ local function installPythonTree()
         return false, "sys bridge is required to install python files"
     end
 
+    local root = getPythonRoot()
     local ok, err = clearPythonTree()
     if not ok then
         return false, err
@@ -116,7 +125,7 @@ local function installPythonTree()
     for _, f in ipairs(parsed.tree) do
         if f.type == "blob" and f.path:sub(1, #PY_ROOT) == PY_ROOT then
             local rel = f.path:sub(#PY_ROOT + 1)
-            local target = "/python/" .. rel
+            local target = root .. "/" .. rel
             print("Downloading python file:", f.path)
             sys.fs.download(f.path, target)
         end

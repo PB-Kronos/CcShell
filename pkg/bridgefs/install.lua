@@ -1,6 +1,6 @@
 local function ensure_file(path, label)
     if not fs.exists(path) then
-        error(label .. " missing: " .. path .. " (install/update python first)", 0)
+        error(label .. " missing: " .. path .. " (install or restore the host Python helpers first)", 0)
     end
     print("Verified:", path)
 end

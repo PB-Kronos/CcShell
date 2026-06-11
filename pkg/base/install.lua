@@ -6,7 +6,6 @@ local function download(src, dst)
 end
 
 local SOURCE_ROOT = "pkg/base/src/"
-local PY_ROOT = SOURCE_ROOT .. "py/"
 local PROGRAMS_ROOT = SOURCE_ROOT .. "bin/rom/programs/"
 
 local rawArgs = {...}
@@ -69,12 +68,7 @@ for _,f in ipairs(textutils.unserializeJSON(http.get("https://api.github.com/rep
         print("Downloading:", f.path)
         local h = http.get("https://raw.githubusercontent.com/PB-Kronos/CcShell/main/"..f.path)
         if h then
-            local o
-            if startsWith(f.path, PY_ROOT) then
-                o = "/python/" .. f.path:sub(#PY_ROOT + 1)
-            else
-                o = "/" .. f.path:sub(#SOURCE_ROOT + 1)
-            end
+            local o = "/" .. f.path:sub(#SOURCE_ROOT + 1)
             local dir = fs.getDir(o)
 
             if dir ~= "" and not fs.exists(dir) then

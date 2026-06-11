@@ -1,6 +1,7 @@
 {
-  [ "list.show_hidden" ] = true,
-  [ "safe_rom" ] = false,
-  [ "motd.enable" ] = false,
   [ "shell.autocomplete_hidden" ] = true,
+  safe_rom = false,
+  python_path = "C:\\Users\\craftos\\python",
+  [ "motd.enable" ] = false,
+  [ "list.show_hidden" ] = true,
 }
