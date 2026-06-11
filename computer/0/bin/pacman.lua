@@ -3,15 +3,6 @@
 local REPO = "https://raw.githubusercontent.com/PB-Kronos/CcShell/main/pkg"
 local DB_PATH = "/var/pacman.db"
 local download = false
-local PY_ROOT = "python/"
-
-local function getPythonRoot()
-    local root = settings and settings.get and settings.get("python_path") or nil
-    if type(root) ~= "string" or root == "" then
-        return "/python"
-    end
-    return root
-end
 
 -- =========================
 -- Utilities
@@ -76,62 +67,6 @@ local function clearCache()
 
     print("Cleared cache:", cache_root)
     return removed
-end
-
-local function clearPythonTree()
-    if not sys or not sys.fs then
-        return false, "sys bridge is required to manage the python tree"
-    end
-
-    local root = getPythonRoot()
-    if not sys.fs.exists(root) then
-        return true
-    end
-
-    local listing = sys.fs.list(root)
-    if not listing or listing == "" then
-        return true
-    end
-
-    for name in tostring(listing):gmatch("[^\r\n]+") do
-        local target = root .. "/" .. name
-        sys.fs.delete(target)
-    end
-
-    return true
-end
-
-local function installPythonTree()
-    if not sys or not sys.fs or not sys.fs.download then
-        return false, "sys bridge is required to install python files"
-    end
-
-    local root = getPythonRoot()
-    local ok, err = clearPythonTree()
-    if not ok then
-        return false, err
-    end
-
-    local tree = fetch("https://api.github.com/repos/PB-Kronos/CcShell/git/trees/main?recursive=1")
-    if not tree then
-        return false, "failed to fetch source tree"
-    end
-
-    local parsed = textutils.unserializeJSON(tree)
-    if not parsed or not parsed.tree then
-        return false, "invalid source tree"
-    end
-
-    for _, f in ipairs(parsed.tree) do
-        if f.type == "blob" and f.path:sub(1, #PY_ROOT) == PY_ROOT then
-            local rel = f.path:sub(#PY_ROOT + 1)
-            local target = root .. "/" .. rel
-            print("Downloading python file:", f.path)
-            sys.fs.download(f.path, target)
-        end
-    end
-
-    return true
 end
 
 local function isInstalled(pkg, db)
@@ -216,25 +151,6 @@ local function installDependencies(pkg, manifest, seen)
     return true
 end
 
-local function installSpecialPackage(pkg)
-    if pkg ~= "python" then
-        return false
-    end
-
-    print("Installing package: python")
-    local ok, err = installPythonTree()
-    if not ok then
-        print("Install failed:", err)
-        return false, err
-    end
-
-    local db = loadDB()
-    db[pkg] = { version = "source", desc = "Host python scripts" }
-    saveDB(db)
-    print("Installed:", pkg)
-    return true
-end
-
 -- =========================
 -- Execution environment
 -- =========================
@@ -286,11 +202,6 @@ end
 function install(pkg, seen, ...)
     if type(seen) ~= "table" then
         seen = nil
-    end
-
-    local special_ok, special_err = installSpecialPackage(pkg)
-    if special_ok ~= false then
-        return special_ok, special_err
     end
 
     print("Installing package:", pkg)
@@ -349,15 +260,6 @@ local function remove(pkg, force)
 end
 
 local function upgrade(pkg, ...)
-    if pkg == "python" then
-        clearCache()
-        local ok, err = installSpecialPackage(pkg)
-        if not ok then
-            print("Upgrade failed:", err)
-        end
-        return
-    end
-
     local path = pkg .. "/upgrade.lua"
 
     clearCache()
