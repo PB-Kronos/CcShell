@@ -1,0 +1,39 @@
+# CcShell Wiki
+
+CcShell-runtime is a CraftOS-PC addon layer that turns the shell into a more structured, package-driven environment.
+
+It is not a full operating system in the traditional sense. The base is still CraftOS-PC. This project adds:
+
+- a `sys` bridge for Lua-to-Python communication
+- host-side file operations
+- Windows taskbar control
+- package installation and dependency handling
+- optional ROM program trees for different computer types
+
+## Quick links
+
+- [sys API](Sys-API)
+- [BridgeFS](BridgeFS)
+- [How to make a package](How-To-Make-A-Package)
+
+## Main concepts
+
+- `base` installs the runtime layout
+- `sys` exposes the Lua bridge API
+- `bridgefs` adds host filesystem support and the `file` debug command
+- `python` is a special pacman target that refreshes the host Python scripts
+
+## Installing
+
+The normal install flow is:
+
+```text
+pacman -S base
+```
+
+Optional program trees can be forced during base install:
+
+```text
+pacman -S base --advanced --fun --http
+```
+
