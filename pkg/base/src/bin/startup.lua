@@ -1,3 +1,11 @@
+if settings and settings.define then
+    settings.define( "python_path", {
+        description = "Host Python helper directory used by the Windows launcher. Leave blank to use the default CraftOS-PC python folder.",
+        default = "",
+        type = "string",
+    } )
+end
+
 -- Setup paths
 local sPath = ".:/bin/rom/programs:/bin/rom:/bin"
 if term.isColor() then
