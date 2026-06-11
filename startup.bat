@@ -9,7 +9,7 @@ if exist "%ROOT%\computer\0\.settings" (
         "$value = $null;" ^
         "if (Test-Path $settings) {" ^
         "  $content = Get-Content -Raw $settings;" ^
-        "  if ($content -match '\[\s*\"python_path\"\s*\]\s*=\s*\"((?:\\.|[^\"])*)\"') {" ^
+        "  if ($content -match '(?:\[\s*\"python_path\"\s*\]|python_path)\s*=\s*\"((?:\\.|[^\"])*)\"') {" ^
         "    $value = $matches[1] -replace '\\\\', '\';" ^
         "  }" ^
         "}" ^
@@ -25,5 +25,4 @@ if exist "%CCSHELL_PYTHON_PATH%\*.py" (
 )
 
 start "" "C:\Program Files\CraftOS-PC\CraftOS-PC.exe"
-
-exit /b
+pause
