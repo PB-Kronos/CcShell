@@ -70,7 +70,6 @@ So while it behaves like an OS in practice, the actual model is:
   - `advanced`
   - `fun`
   - `http`
-- host Python tree installed alongside `base`
 - bridge access for filesystem operations and Windows taskbar control
 - startup logic that loads the `sys` layer automatically
 
@@ -102,7 +101,7 @@ Then use `pacman` to install the packages you want.
 
 ### Base install
 
-The base package copies the runtime layout from the source tree and installs the Python bridge files into the host `python/` directory.
+The base package copies the runtime layout from the source tree. On emulator releases, the host Python helper folder is already included alongside the bundle.
 ```text
 pacman -S base
 ```
@@ -110,16 +109,6 @@ Optional program trees can be forced with flags:
 
 ```text
 pacman -S base --advanced --fun --http
-```
-
-### Updating the host Python tree
-
-The `python` mapping is a special pacman target that refreshes the host Python scripts from the repo's top-level `python/` folder.
-
-Example:
-
-```text
-pacman -S python
 ```
 
 ### Python path configuration
