@@ -21,6 +21,7 @@ Describe the expected behavior.
 3. 
 
 ## Environment
+
 - CcShell version:
 - CraftOS-PC version:
 - Windows version:
