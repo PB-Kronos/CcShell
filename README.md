@@ -191,4 +191,3 @@ The package tree is meant to stay small and explicit:
 ## License
 
 No license file is currently set in this repository.
-If you plan to reuse or redistribute the project, add a license first.
