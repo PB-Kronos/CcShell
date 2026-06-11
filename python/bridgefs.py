@@ -8,6 +8,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CRAFTOS_ROOT = Path(os.path.expandvars(r"%APPDATA%")) / "CraftOS-PC"
+PYTHON_ROOT = Path(os.environ.get("CCSHELL_PYTHON_PATH", str(CRAFTOS_ROOT / "python"))).resolve()
 GITHUB_RAW_BASE = "https://raw.githubusercontent.com/PB-Kronos/CcShell/main"
 
 
@@ -17,6 +18,9 @@ def _normalize(path: str) -> str:
 
 def _resolve_craftos_path(path: str) -> Path:
     raw = _normalize(path).lstrip("/")
+    if raw == "python" or raw.startswith("python/"):
+        tail = raw[6:].lstrip("/") if raw.startswith("python/") else ""
+        return (PYTHON_ROOT / tail).resolve()
     return (CRAFTOS_ROOT / raw).resolve()
 
 
@@ -26,6 +30,8 @@ def _resolve_download_path(path: str) -> Path:
         return CRAFTOS_ROOT.resolve()
 
     if raw.startswith("/"):
+        if raw == "/python" or raw.startswith("/python/"):
+            return (PYTHON_ROOT / raw[len("/python/"):].lstrip("/")).resolve()
         return _resolve_craftos_path(raw)
 
     if len(raw) >= 2 and raw[1] == ":":

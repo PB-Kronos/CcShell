@@ -80,14 +80,25 @@ So while it behaves like an OS in practice, the actual model is:
 
 ### Requirements
 
-- Python installed on the host machine
+- Python on the host machine is only needed for the bridge features.
+- Emulator releases include the Python helpers by default.
 
 ### Recommended setup
 
 1. Download and install the latest release.
 2. Run the program CraftOS-PC startup
-3. Install `base` through your package flow.(optional)
-4. Install `sys` and `bridgefs` if you want the bridge features.(optional)
+3. Install `base` through your package flow. Optional, but recommended.
+4. Install `sys` and `bridgefs` if you want the bridge features. Optional.
+
+### Minecraft / vanilla install
+
+If you are not using the emulator release, fetch `pacman.lua` directly:
+
+```text
+wget https://raw.githubusercontent.com/PB-Kronos/CcShell/main/pacman.lua /rom/programs/pacman.lua
+```
+
+Then use `pacman` to install the packages you want.
 
 ### Base install
 
@@ -103,13 +114,30 @@ pacman -S base --advanced --fun --http
 
 ### Updating the host Python tree
 
-The `python` mapping is a special pacman target that refreshes the host Python scripts from `source/py/`.
+The `python` mapping is a special pacman target that refreshes the host Python scripts from the repo's top-level `python/` folder.
 
 Example:
 
 ```text
 pacman -S python
 ```
+
+### Python path configuration
+
+The host Python folder can be changed with the normal `set` command:
+
+```text
+set python_path "C:\Users\craftos\AppData\Roaming\CraftOS-PC\python"
+```
+
+To restore the default launcher behavior, leave it blank:
+
+```text
+set python_path ""
+```
+
+The default points at the CraftOS-PC `python` folder under `%APPDATA%`.
+You can also point it at any other Windows path if you want the helpers installed elsewhere.
 
 ---
 

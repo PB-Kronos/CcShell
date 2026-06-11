@@ -20,6 +20,7 @@ except ModuleNotFoundError:
 
 pending = None
 CRAFTOS_ROOT = Path(os.path.expandvars(r"%APPDATA%")) / "CraftOS-PC"
+PYTHON_ROOT = Path(os.environ.get("CCSHELL_PYTHON_PATH", str(CRAFTOS_ROOT / "python"))).resolve()
 _taskbar_hidden = False
 _windows_key_blocked = False
 _keyboard_hook = None
@@ -117,10 +118,18 @@ def repo_download(src: str, dst: str):
     import urllib.request
 
     raw = dst.replace("\\", "/")
-    target = (CRAFTOS_ROOT / raw.lstrip("/")).resolve()
-    target_root = CRAFTOS_ROOT.resolve()
-    if not str(target).startswith(str(target_root)):
-        raise ValueError("download destination must stay within CraftOS-PC")
+    if raw == "/python" or raw.startswith("/python/"):
+        target = (PYTHON_ROOT / raw[len("/python/"):].lstrip("/")).resolve()
+    elif raw.startswith("/"):
+        target = (CRAFTOS_ROOT / raw.lstrip("/")).resolve()
+        target_root = CRAFTOS_ROOT.resolve()
+        if not str(target).startswith(str(target_root)):
+            raise ValueError("download destination must stay within CraftOS-PC")
+    else:
+        target = (CRAFTOS_ROOT / raw).resolve()
+        target_root = CRAFTOS_ROOT.resolve()
+        if not str(target).startswith(str(target_root)):
+            raise ValueError("download destination must stay within CraftOS-PC")
 
     url = src if src.startswith(("http://", "https://")) else f"https://raw.githubusercontent.com/PB-Kronos/CcShell/main/{src.lstrip('/')}"
     target.parent.mkdir(parents=True, exist_ok=True)
