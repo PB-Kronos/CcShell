@@ -1,7 +1,7 @@
--- AI Chatbot voor CC:Tweaked (CcShell Fix)
-local KEY_FILE = ".ai_key"
-local SYSTEM_FILE = ".ai_system"
-local HISTORY_FILE = ".ai_history"
+-- AI Chatbot for CC:Tweaked (CcShell Fix)
+local KEY_FILE = "/var/.ai_key"
+local SYSTEM_FILE = "/var/.ai_system"
+local HISTORY_FILE = "/var/.ai_history" -- Saves only pure text dialogue lines
 
 -- ALWAYS USE THIS URL:
 local URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -10,7 +10,7 @@ local MODEL = "openrouter/free"
 local API_KEY = ""
 local messages = {}
 
--- Filter UTF-8 symbolen naar platte ASCII om schermvervorming te voorkomen
+-- Filter UTF-8 symbols to plain ASCII to prevent screen distortion
 local function sanitizeText(text)
     if not text then return "" end
     text = text:gsub("\226\128\153", "'")  -- ’
@@ -31,7 +31,7 @@ local function sanitizeText(text)
     return table.concat(clean)
 end
 
--- Laad de API-key
+-- Load the API key
 local function getApiKey()
     if fs.exists(KEY_FILE) then
         local file = fs.open(KEY_FILE, "r")
@@ -48,14 +48,14 @@ local function getApiKey()
             local file = fs.open(KEY_FILE, "w")
             file.writeLine(API_KEY)
             file.close()
-            print("Key saved succesfully.\n")
+            print("Key saved successfully.\n")
         else
             error("Invalid Key.")
         end
     end
 end
 
--- Regelafbreking voor het computerscherm
+-- Word wrapping for the computer screen
 local function printWrapped(text)
     local width, _ = term.getSize()
     local lines = {}
@@ -76,12 +76,14 @@ local function printWrapped(text)
     for _, line in ipairs(lines) do print(line) end
 end
 
-local function saveHistory()
-    local file = fs.open(HISTORY_FILE, "w")
-    file.write(textutils.serializeJSON(messages))
+-- Export a single line cleanly to the history file (appends to bottom)
+local function appendToHistoryFile(sender, text)
+    local file = fs.open(HISTORY_FILE, "a")
+    file.writeLine(sender .. ": " .. text)
     file.close()
 end
 
+-- Load the system prompt and populate chat context from clean text export logs
 local function loadSystemAndHistory()
     if not fs.exists(SYSTEM_FILE) then
         local file = fs.open(SYSTEM_FILE, "w")
@@ -93,53 +95,52 @@ local function loadSystemAndHistory()
     local systemContent = file.readAll()
     file.close()
 
-    -- Check of er al een opgeslagen geschiedenis bestaat
-    if fs.exists(HISTORY_FILE) then
-        local histFile = fs.open(HISTORY_FILE, "r")
-        local histContent = histFile.readAll()
-        histFile.close()
-        
-        local savedMessages = textutils.unserializeJSON(histContent)
-        if savedMessages and type(savedMessages) == "table" and #savedMessages > 0 then
-            messages = savedMessages
-            -- Werk de system prompt bij op de eerste index
-            messages[1] = { role = "system", content = systemContent }
-            
-            -- Print de herstelde geschiedenis op het scherm
-            term.setTextColor(colors.gray)
-            print("[Laatste sessie hersteld]:")
-            
-            for i = 2, #messages do
-                local msg = messages[i]
-                if msg.role == "user" then
-                    term.setTextColor(colors.green)
-                    write("Jij: ")
-                    term.setTextColor(colors.white)
-                    print(msg.content)
-                elseif msg.role == "assistant" then
-                    term.setTextColor(colors.cyan)
-                    write("AI: ")
-                    term.setTextColor(colors.lightGray)
-                    printWrapped(msg.content)
-                    print("")
-                end
-            end
-            term.setTextColor(colors.yellow)
-            print("---------------------------------------")
-            return
-        end
-    end
-
-    -- Fallback als er geen geschiedenisbestand is
+    -- Establish live runtime table session with system context
     messages = {
         { role = "system", content = systemContent }
     }
+
+    -- Reconstruct live context arrays using clean textual log files
+    if fs.exists(HISTORY_FILE) then
+        term.setTextColor(colors.gray)
+        print("[Last session restored]:")
+        
+        local histFile = fs.open(HISTORY_FILE, "r")
+        local line = histFile.readLine()
+        
+        while line do
+            if line:sub(1, 5) == "You: " then
+                local content = line:sub(6)
+                table.insert(messages, { role = "user", content = content })
+                
+                term.setTextColor(colors.green)
+                write("You: ")
+                term.setTextColor(colors.white)
+                print(content)
+                
+            elseif line:sub(1, 4) == "AI: " then
+                local content = line:sub(5)
+                table.insert(messages, { role = "assistant", content = content })
+                
+                term.setTextColor(colors.cyan)
+                write("AI: ")
+                term.setTextColor(colors.lightGray)
+                printWrapped(content)
+                print("")
+            end
+            
+            line = histFile.readLine()
+        end
+        histFile.close()
+        
+        term.setTextColor(colors.yellow)
+        print("---------------------------------------")
+    end
 end
 
--- HTTP POST aanroep met string-lengte fix
+-- HTTP POST request with string length fix
 local function askAI(prompt)
     table.insert(messages, { role = "user", content = prompt })
-    saveHistory()
     
     local payloadData = textutils.serializeJSON({
         model = MODEL, 
@@ -161,10 +162,9 @@ local function askAI(prompt)
     local response, err = http.post(URL, payloadData, headers)
     
     if not response then
-        printError("\n[NETWERK FOUT] Handshake geweigerd.")
+        printError("\n[NETWORK ERROR] Handshake refused.")
         if err then print("Details: " .. tostring(err)) end
         table.remove(messages)
-        saveHistory()
         return nil
     end
     
@@ -173,10 +173,9 @@ local function askAI(prompt)
     response.close()
     
     if statusCode ~= 200 then
-        printError("\n[API FOUT] Statuscode: " .. tostring(statusCode))
+        printError("\n[API ERROR] Status code: " .. tostring(statusCode))
         print(responseText:sub(1, 150))
         table.remove(messages)
-        saveHistory()
         return nil
     end
     
@@ -185,16 +184,19 @@ local function askAI(prompt)
         for _, choice in pairs(data.choices) do
             if choice.message and choice.message.content then
                 local aiReply = sanitizeText(choice.message.content)
+                
+                -- Save cleanly to text log file after confirming a successful 200 status code
+                appendToHistoryFile("You", prompt)
+                appendToHistoryFile("AI", aiReply)
+                
                 table.insert(messages, { role = "assistant", content = aiReply })
-                saveHistory()
                 return aiReply
             end
         end
     end
     
-    printError("\n[FORMAAT FOUT] Ongeldige JSON ontvangen.")
+    printError("\n[FORMAT ERROR] Invalid JSON received.")
     table.remove(messages)
-    saveHistory()
     return nil
 end
 
@@ -211,12 +213,12 @@ term.setTextColor(colors.white)
 print("Model: " .. MODEL)
 print("Commands: 'exit' | 'clear'\n")
 
--- Laad de geschiedenis netjes in de actieve terminal
+-- Load system rules and render past text logs
 loadSystemAndHistory()
 
 while true do
     term.setTextColor(colors.green)
-    write("Jij: ")
+    write("You: ")
     term.setTextColor(colors.white)
     local input = read()
     
