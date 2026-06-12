@@ -83,7 +83,72 @@ local function appendToHistoryFile(sender, text)
     file.close()
 end
 
--- New Feature: Extracts and runs Lua code block from AI reply
+-- Send a direct message with a custom role (e.g. "output")
+local function sendRoleMessage(role, content)
+    if not role or not content or role == "" or content == "" then
+        printError("[sendRoleMessage] Invalid role or content.")
+        return nil
+    end
+
+    -- Insert custom role message into context
+    table.insert(messages, { role = role, content = content })
+
+    local payloadData = textutils.serializeJSON({
+        model = MODEL,
+        messages = messages,
+        max_tokens = 250
+    })
+
+    local headers = {
+        ["Authorization"] = "Bearer " .. API_KEY,
+        ["Content-Type"] = "application/json",
+        ["Content-Length"] = tostring(#payloadData),
+        ["HTTP-Referer"] = "https://openrouter.ai",
+        ["X-Title"] = "CcShell Terminal Assistant",
+        ["User-Agent"] = "Mozilla/5.0"
+    }
+
+    print("\n[CcShellAI] Sending output (" .. role .. ")...")
+
+    local response, err = http.post(URL, payloadData, headers)
+
+    if not response then
+        printError("[NETWORK ERROR]")
+        if err then print(err) end
+        table.remove(messages)
+        return nil
+    end
+
+    local responseText = response.readAll()
+    local statusCode = response.getResponseCode()
+    response.close()
+
+    if statusCode ~= 200 then
+        printError("[API ERROR] " .. statusCode)
+        table.remove(messages)
+        return nil
+    end
+
+    local data = textutils.unserializeJSON(responseText)
+
+    if data and data.choices then
+        local reply = sanitizeText(data.choices[1].message.content)
+
+        -- Save + persist
+        appendToHistoryFile(role, content)
+        appendToHistoryFile("AI", reply)
+
+        table.insert(messages, { role = "assistant", content = reply })
+
+        return reply
+    end
+
+    table.remove(messages)
+    printError("[FORMAT ERROR]")
+    return nil
+end
+
+--Extracts and runs Lua code block from AI reply
 local function executeLuaCommands(text)
     -- Look for [EXECUTE]...[/EXECUTE] tags
     for code in string.gmatch(text, "%[EXECUTE%](.-)%[%/EXECUTE%]") do
@@ -104,6 +169,7 @@ local function executeLuaCommands(text)
                 term.setTextColor(colors.red)
                 print("[System] Runtime Error: " .. tostring(runErr))
             end
+		sendRoleMessage("output", "Success: " .. success .. " err: " .. err .. " runErr: " .. runErr)
         else
             term.setTextColor(colors.red)
             print("[System] Syntax Error: " .. tostring(err))

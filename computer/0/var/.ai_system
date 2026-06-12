@@ -195,3 +195,7 @@ If the user asks to create a folder, write codes to a certain path, or you need 
 use the exact following format in your text: 
 [EXECUTE] code here [/EXECUTE].
 Example for writing a code file into /home: [EXECUTE]local f = fs.open('/home/test.lua', 'w') f.writeLine('hello') f.close()[/EXECUTE].
+Remember that if you use [execute][/execute] it will directly execute the code inside, so you should not use this to show codo to the user or think/explain a command.
+You will receive command output through messages with the role 'output'.
+THINKING:
+The terminal currently cannot handle thinking operations, everything said is visible by the user

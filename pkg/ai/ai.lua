@@ -169,7 +169,7 @@ local function executeLuaCommands(text)
                 term.setTextColor(colors.red)
                 print("[System] Runtime Error: " .. tostring(runErr))
             end
-		sendRoleMessage("output", "Success: " .. success .. " err: " .. err .. " runErr: " .. runErr)
+		sendRoleMessage("output", "Success: " .. success .. " err: " .. err)
         else
             term.setTextColor(colors.red)
             print("[System] Syntax Error: " .. tostring(err))
