@@ -1,10 +1,14 @@
 {
-  sys = {
+  ai = {
+    desc = "AI Chat agent made for CcShell",
     version = "1.0",
-    desc = "System bridge for Windows control and HTTP messaging",
   },
   base = {
-    version = "1.0",
     desc = "Install the base runtime layout from the source tree",
+    version = "1.0",
+  },
+  sys = {
+    desc = "System bridge for Windows control and HTTP messaging",
+    version = "1.0",
   },
 }

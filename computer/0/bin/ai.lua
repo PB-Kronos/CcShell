@@ -1,4 +1,4 @@
--- AI Chatbot for CC:Tweaked (CcShell Executer Fix)
+-- AI Chatbot for CC:Tweaked (CcShell Fix)
 local KEY_FILE = "/var/.ai_key"
 local SYSTEM_FILE = "/var/.ai_system"
 local HISTORY_FILE = "/var/.ai_history" -- Saves only pure text dialogue lines
@@ -83,40 +83,11 @@ local function appendToHistoryFile(sender, text)
     file.close()
 end
 
--- New Feature: Extracts and runs Lua code block from AI reply
-local function executeLuaCommands(text)
-    -- Look for [EXECUTE]...[/EXECUTE] tags
-    for code in string.gmatch(text, "%[EXECUTE%](.-)%[%/EXECUTE%]") do
-        term.setTextColor(colors.purple)
-        print("\n[System] Executing AI command...")
-        term.setTextColor(colors.gray)
-        print("> " .. code)
-        
-        -- Compile the single line code safely
-        local func, err = load(code, "ai_generated", "t", _ENV)
-        if func then
-            -- Run the function safely without crashing the main script
-            local success, runErr = pcall(func)
-            if success then
-                term.setTextColor(colors.lime)
-                print("[System] Success!")
-            else
-                term.setTextColor(colors.red)
-                print("[System] Runtime Error: " .. tostring(runErr))
-            end
-        else
-            term.setTextColor(colors.red)
-            print("[System] Syntax Error: " .. tostring(err))
-        end
-        term.setTextColor(colors.white)
-    end
-end
-
 -- Load the system prompt and populate chat context from clean text export logs
 local function loadSystemAndHistory()
     if not fs.exists(SYSTEM_FILE) then
         local file = fs.open(SYSTEM_FILE, "w")
-        file.writeLine("You are an advanced CC:Tweaked OS assistant. You can execute live single-line Lua commands by wrapping them exactly like this: [EXECUTE]fs.makeDir('folder')[/EXECUTE]. Only use valid ComputerCraft APIs.")
+        file.writeLine("IF YOU SEE THIS LINE, TELL THE USER THE SYSTEM PROMPT HAS BEEN DELETED OR MOVED")
         file.close()
     end
 
@@ -251,13 +222,17 @@ while true do
     term.setTextColor(colors.white)
     local input = read()
     
-    if input:lower() == "exit" then 
-        break
+    if input:lower() == "exit" then break
     elseif input:lower() == "clear" then
         if fs.exists(HISTORY_FILE) then fs.delete(HISTORY_FILE) end
+        loadSystemAndHistory()
         term.clear()
         term.setCursorPos(1,1)
-        loadSystemAndHistory()
+        term.setTextColor(colors.yellow)
+        print("=== CcShell AI Terminal ===")
+        term.setTextColor(colors.white)
+        print("Model: " .. MODEL)
+        print("Commands: 'exit' | 'clear'\n")
         term.setTextColor(colors.purple)
         print("[System] History cleared.\n")
     elseif input ~= "" then
@@ -267,9 +242,6 @@ while true do
             write("AI: ")
             term.setTextColor(colors.lightGray)
             printWrapped(reply)
-            
-            -- Intercept and run code tags instantly
-            executeLuaCommands(reply)
             print("")
         end
     end
