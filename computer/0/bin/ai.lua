@@ -1,8 +1,11 @@
--- AI Chatbot for CC:Tweaked (Stable + Execute Output Capture + Clear + Compact)
+-- =========================
+-- CC:TWEAKED AI AGENT (ASYNC STABLE VERSION)
+-- =========================
 
 local KEY_FILE = "/var/.ai_key"
 local SYSTEM_FILE = "/var/.ai_system"
 local HISTORY_FILE = "/var/.ai_history"
+local MEMORY_FILE = "/var/.ai_memory.json"
 
 local URL = "https://openrouter.ai/api/v1/chat/completions"
 local MODEL = "openrouter/free"
@@ -10,9 +13,15 @@ local MODEL = "openrouter/free"
 local API_KEY = ""
 local messages = {}
 
--- ========================
+-- =========================
+-- QUEUE SYSTEM
+-- =========================
+local requestQueue = {}
+local activeRequest = false
+
+-- =========================
 -- SANITIZE
--- ========================
+-- =========================
 local function sanitizeText(text)
     if not text then return "" end
 
@@ -34,9 +43,9 @@ local function sanitizeText(text)
     return table.concat(out)
 end
 
--- ========================
+-- =========================
 -- API KEY
--- ========================
+-- =========================
 local function getApiKey()
     if fs.exists(KEY_FILE) then
         local f = fs.open(KEY_FILE, "r")
@@ -55,9 +64,9 @@ local function getApiKey()
     end
 end
 
--- ========================
+-- =========================
 -- PRINT WRAP
--- ========================
+-- =========================
 local function printWrapped(text)
     local w, _ = term.getSize()
     for line in text:gmatch("[^\n]+") do
@@ -69,22 +78,52 @@ local function printWrapped(text)
     end
 end
 
--- ========================
+-- =========================
 -- HISTORY
--- ========================
+-- =========================
 local function appendToHistoryFile(sender, text)
     local f = fs.open(HISTORY_FILE, "a")
     f.writeLine(sender .. ": " .. text)
     f.close()
 end
 
--- ========================
--- SYSTEM LOAD
--- ========================
-local function loadSystemAndHistory()
+-- =========================
+-- MEMORY SAVE/LOAD
+-- =========================
+local function saveMemory(summary)
+    local data = {
+        messages = messages,
+        summary = summary or ""
+    }
+
+    local f = fs.open(MEMORY_FILE, "w")
+    f.write(textutils.serializeJSON(data))
+    f.close()
+end
+
+local function loadMemory()
+    if fs.exists(MEMORY_FILE) then
+        local f = fs.open(MEMORY_FILE, "r")
+        local raw = f.readAll()
+        f.close()
+
+        local ok, data = pcall(textutils.unserializeJSON, raw)
+        if ok and data and data.messages then
+            messages = data.messages
+            return
+        end
+    end
+
+    messages = {}
+end
+
+-- =========================
+-- SYSTEM
+-- =========================
+local function loadSystem()
     if not fs.exists(SYSTEM_FILE) then
         local f = fs.open(SYSTEM_FILE, "w")
-        f.writeLine("You are a CC:Tweaked assistant. Use [EXECUTE]...[/EXECUTE] for commands.")
+        f.writeLine("You are a CC:Tweaked AI assistant. Use [EXECUTE] blocks for commands.")
         f.close()
     end
 
@@ -92,102 +131,77 @@ local function loadSystemAndHistory()
     local sys = f.readAll()
     f.close()
 
-    messages = {
-        { role = "system", content = sys }
-    }
+    table.insert(messages, 1, { role = "system", content = sys })
 end
 
--- ========================
--- HTTP (RETRY SAFE)
--- ========================
-local function sendRequest()
-    local payload = textutils.serializeJSON({
-        model = MODEL,
-        messages = messages,
-        max_tokens = 250
+-- =========================
+-- TRIM CONTEXT
+-- =========================
+local function trimMessages()
+    while #messages > 18 do
+        table.remove(messages, 2)
+    end
+end
+
+-- =========================
+-- REQUEST QUEUE
+-- =========================
+local function queueRequest(payload, callback)
+    table.insert(requestQueue, {
+        payload = payload,
+        callback = callback
     })
+end
+
+local function processQueue()
+    if activeRequest or #requestQueue == 0 then return end
+
+    local job = table.remove(requestQueue, 1)
+    activeRequest = true
 
     local headers = {
         ["Authorization"] = "Bearer " .. API_KEY,
         ["Content-Type"] = "application/json",
-        ["Content-Length"] = tostring(#payload),
         ["HTTP-Referer"] = "https://openrouter.ai",
         ["X-Title"] = "CcShell AI",
         ["User-Agent"] = "Mozilla/5.0"
     }
 
-    for attempt = 1, 3 do
-        local res = http.post(URL, payload, headers)
+    local function attempt(payload)
+        for i = 1, 3 do
+            local res = http.post(URL, payload, headers)
 
-        if res then
-            local txt = res.readAll()
-            local code = res.getResponseCode()
-            res.close()
+            if res then
+                local txt = res.readAll()
+                local code = res.getResponseCode()
+                res.close()
 
-            if code == 200 and txt and txt:find("{") then
-                local ok, data = pcall(textutils.unserializeJSON, txt)
-                if ok and data and data.choices and data.choices[1] then
-                    return data.choices[1].message.content
+                if code == 200 and txt and txt:find("{") then
+                    local ok, data = pcall(textutils.unserializeJSON, txt)
+                    if ok and data and data.choices and data.choices[1] then
+                        return data.choices[1].message.content
+                    end
                 end
             end
+
+            sleep(1 + i)
         end
 
-        sleep(1)
-    end
-
-    return nil
-end
-
--- ========================
--- ASK AI
--- ========================
-local function askAI(prompt)
-    table.insert(messages, { role = "user", content = prompt })
-
-    if #messages > 20 then
-        table.remove(messages, 2)
-    end
-
-    local reply = sendRequest()
-    if not reply then
-        table.remove(messages)
-        printError("[FAILED] No response")
         return nil
     end
 
-    reply = sanitizeText(reply)
+    local reply = attempt(job.payload)
 
-    appendToHistoryFile("You", prompt)
-    appendToHistoryFile("AI", reply)
-
-    table.insert(messages, { role = "assistant", content = reply })
-    return reply
-end
-
--- ========================
--- ROLE MESSAGE (OUTPUT)
--- ========================
-local function sendRoleMessage(role, content)
-    table.insert(messages, { role = role, content = content })
-
-    local reply = sendRequest()
-    if not reply then
-        table.remove(messages)
-        return nil
+    if job.callback then
+        job.callback(reply)
     end
 
-    reply = sanitizeText(reply)
-
-    appendToHistoryFile(role, content)
-    appendToHistoryFile("AI", reply)
-
-    table.insert(messages, { role = "assistant", content = reply })
-    return reply
+    activeRequest = false
 end
 
--- ========================
--- EXECUTION + CAPTURE
--- ========================
+-- =========================
+-- EXECUTE CAPTURE
+-- =========================
 local function executeLuaCommands(text)
     for code in string.gmatch(text, "%[EXECUTE%](.-)%[%/EXECUTE%]") do
         term.setTextColor(colors.purple)
@@ -208,7 +222,7 @@ local function executeLuaCommands(text)
             oldPrint(line)
         end
 
-        local func, err = load(code, "ai_exec", "t", _ENV)
+        local func = load(code, "ai_exec", "t", _ENV)
 
         if func then
             local results = { pcall(func) }
@@ -231,130 +245,106 @@ local function executeLuaCommands(text)
 
             if msg == "" then msg = "No output." end
 
-            sendRoleMessage("output", msg)
+            table.insert(messages, { role = "system", content = msg })
+            saveMemory()
 
             if success then
-                term.setTextColor(colors.lime)
                 print("[Success]")
             else
-                term.setTextColor(colors.red)
                 print("[Runtime Error]")
             end
         else
             print = oldPrint
-            term.setTextColor(colors.red)
             print("[Syntax Error]")
-            sendRoleMessage("output", "Syntax Error: " .. tostring(err))
+        end
+    end
+end
+
+-- =========================
+-- ASK AI (ASYNC)
+-- =========================
+local function askAI(prompt)
+    table.insert(messages, { role = "user", content = prompt })
+    trimMessages()
+
+    local payload = textutils.serializeJSON({
+        model = MODEL,
+        messages = messages,
+        max_tokens = 250
+    })
+
+    queueRequest(payload, function(reply)
+        if not reply then
+            printError("[AI OFFLINE]")
+            return
         end
 
-        term.setTextColor(colors.white)
-    end
-end
-
--- ========================
--- CLEAR HISTORY
--- ========================
-local function clearHistory()
-    if fs.exists(HISTORY_FILE) then
-        fs.delete(HISTORY_FILE)
-    end
-    loadSystemAndHistory()
-
-    term.setTextColor(colors.purple)
-    print("[System] History cleared.")
-    term.setTextColor(colors.white)
-end
-
--- ========================
--- COMPACT MEMORY
--- ========================
-local function compactHistory()
-    if #messages < 3 then
-        print("[System] Nothing to compact.")
-        return
-    end
-
-    term.setTextColor(colors.yellow)
-    print("[System] Compacting...")
-
-    local transcript = ""
-    for i = 2, #messages do
-        local m = messages[i]
-        transcript = transcript .. m.role .. ": " .. m.content .. "\n"
-    end
-
-    local prompt = "Summarize into compact memory:\n\n" .. transcript
-
-    local old = messages
-
-    messages = {
-        old[1],
-        { role = "user", content = prompt }
-    }
-
-    local reply = sendRequest()
-
-    if reply then
         reply = sanitizeText(reply)
 
-        messages = {
-            old[1],
-            { role = "system", content = "Memory: " .. reply }
-        }
+        appendToHistoryFile("You", prompt)
+        appendToHistoryFile("AI", reply)
 
-        local f = fs.open(HISTORY_FILE, "w")
-        f.writeLine("SYSTEM: compacted")
-        f.writeLine(reply)
-        f.close()
+        table.insert(messages, { role = "assistant", content = reply })
+        saveMemory()
 
-        print("[System] Compact complete.")
-    else
-        messages = old
-        printError("[System] Compact failed.")
-    end
+        term.setTextColor(colors.cyan)
+        write("AI: ")
+        term.setTextColor(colors.lightGray)
+        printWrapped(reply)
 
-    term.setTextColor(colors.white)
+        executeLuaCommands(reply)
+        print("")
+    end)
 end
 
--- ========================
--- MAIN
--- ========================
+-- =========================
+-- CLEAR
+-- =========================
+local function clearHistory()
+    if fs.exists(HISTORY_FILE) then fs.delete(HISTORY_FILE) end
+    messages = {}
+    loadSystem()
+    print("[System] Cleared")
+end
+
+-- =========================
+-- COMPACT
+-- =========================
+local function compactHistory()
+    print("[System] Compact not implemented in async version (optional upgrade).")
+end
+
+-- =========================
+-- MAIN LOOP
+-- =========================
 term.clear()
 term.setCursorPos(1,1)
 
 getApiKey()
-loadSystemAndHistory()
+loadMemory()
+loadSystem()
 
-print("=== CcTweaked AI ===")
-print("Commands: /exit | /clear | /compact")
+print("=== CC:Tweaked AI (Async Stable) ===")
+print("Commands: exit | clear | compact")
 
 while true do
+    processQueue()
+
     term.setTextColor(colors.green)
     write("You: ")
     term.setTextColor(colors.white)
 
     local input = read()
 
-    if input == "/exit" then
-        break
+    if input == "exit" then break end
 
-    elseif input == "/clear" then
+    if input == "clear" then
         clearHistory()
 
-    elseif input == "/compact" then
+    elseif input == "compact" then
         compactHistory()
 
     elseif input ~= "" then
-        local reply = askAI(input)
-
-        if reply then
-            term.setTextColor(colors.cyan)
-            write("AI: ")
-            term.setTextColor(colors.lightGray)
-            printWrapped(reply)
-
-            executeLuaCommands(reply)
-            print("")
-        end
+        askAI(input)
     end
 end
