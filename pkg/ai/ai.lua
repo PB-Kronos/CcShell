@@ -1,99 +1,87 @@
--- AI Chatbot for CC:Tweaked (CcShell Executer Fix)
+-- AI Chatbot for CC:Tweaked (Stable + Output Capture)
+
 local KEY_FILE = "/var/.ai_key"
 local SYSTEM_FILE = "/var/.ai_system"
-local HISTORY_FILE = "/var/.ai_history" -- Saves only pure text dialogue lines
+local HISTORY_FILE = "/var/.ai_history"
 
--- ALWAYS USE THIS URL:
 local URL = "https://openrouter.ai/api/v1/chat/completions"
 local MODEL = "openrouter/free"
 
 local API_KEY = ""
 local messages = {}
 
--- Filter UTF-8 symbols to plain ASCII to prevent screen distortion
+-- ========================
+-- TEXT SANITIZER
+-- ========================
 local function sanitizeText(text)
     if not text then return "" end
-    text = text:gsub("\226\128\153", "'")  -- ’
-    text = text:gsub("\226\128\152", "'")  -- ‘
-    text = text:gsub("\226\128\156", '"')  -- “
-    text = text:gsub("\226\128\157", '"')  -- ”
-    text = text:gsub("\226\128\147", "-")  -- –
-    text = text:gsub("\226\128\148", "--") -- —
-    text = text:gsub("\226\128\162", "*")  -- •
-    
+    text = text:gsub("\226\128\153", "'")
+    text = text:gsub("\226\128\152", "'")
+    text = text:gsub("\226\128\156", '"')
+    text = text:gsub("\226\128\157", '"')
+    text = text:gsub("\226\128\147", "-")
+    text = text:gsub("\226\128\148", "--")
+    text = text:gsub("\226\128\162", "*")
+
     local clean = {}
     for i = 1, #text do
-        local byte = text:byte(i)
-        if byte >= 32 and byte <= 126 or byte == 10 or byte == 13 then
-            table.insert(clean, string.char(byte))
+        local b = text:byte(i)
+        if (b >= 32 and b <= 126) or b == 10 or b == 13 then
+            table.insert(clean, string.char(b))
         end
     end
     return table.concat(clean)
 end
 
--- Load the API key
+-- ========================
+-- API KEY
+-- ========================
 local function getApiKey()
     if fs.exists(KEY_FILE) then
-        local file = fs.open(KEY_FILE, "r")
-        API_KEY = file.readLine():gsub("%s+", "")
-        file.close()
+        local f = fs.open(KEY_FILE, "r")
+        API_KEY = f.readLine():gsub("%s+", "")
+        f.close()
     else
         term.setTextColor(colors.yellow)
-        print("No OpenRouter API-Key found.")
+        print("No API key found.")
         term.setTextColor(colors.white)
         write("Enter API-Key: ")
         API_KEY = read("*"):gsub("%s+", "")
-        
-        if API_KEY and API_KEY ~= "" then
-            local file = fs.open(KEY_FILE, "w")
-            file.writeLine(API_KEY)
-            file.close()
-            print("Key saved successfully.\n")
-        else
-            error("Invalid Key.")
-        end
+
+        local f = fs.open(KEY_FILE, "w")
+        f.writeLine(API_KEY)
+        f.close()
     end
 end
 
--- Word wrapping for the computer screen
+-- ========================
+-- PRINT WRAP
+-- ========================
 local function printWrapped(text)
-    local width, _ = term.getSize()
-    local lines = {}
-    for rawLine in string.gmatch(text .. "\n", "([^\n]*)\n") do
-        local words = {}
-        for word in string.gmatch(rawLine, "%S+") do table.insert(words, word) end
-        local currentLine = ""
-        for _, word in ipairs(words) do
-            if #currentLine + #word + 1 > width then
-                table.insert(lines, currentLine)
-                currentLine = word
-            else
-                if currentLine == "" then currentLine = word else currentLine = currentLine .. " " .. word end
-            end
+    local w = term.getSize()
+    for line in text:gmatch("[^\n]+") do
+        while #line > w do
+            print(line:sub(1, w))
+            line = line:sub(w + 1)
         end
-        table.insert(lines, currentLine)
+        print(line)
     end
-    for _, line in ipairs(lines) do print(line) end
 end
 
--- Export a single line cleanly to the history file (appends to bottom)
+-- ========================
+-- HISTORY
+-- ========================
 local function appendToHistoryFile(sender, text)
-    local file = fs.open(HISTORY_FILE, "a")
-    file.writeLine(sender .. ": " .. text)
-    file.close()
+    local f = fs.open(HISTORY_FILE, "a")
+    f.writeLine(sender .. ": " .. text)
+    f.close()
 end
 
--- Send a direct message with a custom role (e.g. "output")
-local function sendRoleMessage(role, content)
-    if not role or not content or role == "" or content == "" then
-        printError("[sendRoleMessage] Invalid role or content.")
-        return nil
-    end
-
-    -- Insert custom role message into context
-    table.insert(messages, { role = role, content = content })
-
-    local payloadData = textutils.serializeJSON({
+-- ========================
+-- SAFE HTTP REQUEST
+-- ========================
+local function sendRequest()
+    local payload = textutils.serializeJSON({
         model = MODEL,
         messages = messages,
         max_tokens = 250
@@ -102,239 +90,203 @@ local function sendRoleMessage(role, content)
     local headers = {
         ["Authorization"] = "Bearer " .. API_KEY,
         ["Content-Type"] = "application/json",
-        ["Content-Length"] = tostring(#payloadData),
+        ["Content-Length"] = tostring(#payload),
         ["HTTP-Referer"] = "https://openrouter.ai",
-        ["X-Title"] = "CcShell Terminal Assistant",
+        ["X-Title"] = "CcShell AI",
         ["User-Agent"] = "Mozilla/5.0"
     }
 
-    print("\n[CcShellAI] Sending output (" .. role .. ")...")
+    for attempt = 1, 3 do
+        print("[Request attempt " .. attempt .. "]")
 
-    local response, err = http.post(URL, payloadData, headers)
+        local res, err = http.post(URL, payload, headers)
 
-    if not response then
-        printError("[NETWORK ERROR]")
-        if err then print(err) end
-        table.remove(messages)
-        return nil
+        if res then
+            local txt = res.readAll()
+            local code = res.getResponseCode()
+            res.close()
+
+            if code == 200 and txt and txt:find("{") then
+                local ok, data = pcall(textutils.unserializeJSON, txt)
+
+                if ok and data and data.choices and data.choices[1] then
+                    return data.choices[1].message.content
+                end
+            end
+        end
+
+        sleep(1)
     end
 
-    local responseText = response.readAll()
-    local statusCode = response.getResponseCode()
-    response.close()
+    return nil
+end
 
-    if statusCode ~= 200 then
-        printError("[API ERROR] " .. statusCode)
-        table.remove(messages)
-        return nil
+-- ========================
+-- ASK AI
+-- ========================
+local function askAI(prompt)
+    table.insert(messages, { role = "user", content = prompt })
+
+    if #messages > 20 then
+        table.remove(messages, 2)
     end
 
-    local data = textutils.unserializeJSON(responseText)
+    local reply = sendRequest()
 
-    if data and data.choices then
-        local reply = sanitizeText(data.choices[1].message.content)
+    if reply then
+        reply = sanitizeText(reply)
 
-        -- Save + persist
-        appendToHistoryFile(role, content)
+        appendToHistoryFile("You", prompt)
         appendToHistoryFile("AI", reply)
 
         table.insert(messages, { role = "assistant", content = reply })
-
         return reply
     end
 
     table.remove(messages)
-    printError("[FORMAT ERROR]")
+    printError("[FAILED] No valid response.")
     return nil
 end
 
---Extracts and runs Lua code block from AI reply
-local function executeLuaCommands(text)
-    -- Look for [EXECUTE]...[/EXECUTE] tags
-    for code in string.gmatch(text, "%[EXECUTE%](.-)%[%/EXECUTE%]") do
-        term.setTextColor(colors.purple)
-        print("\n[System] Executing AI command...")
-        term.setTextColor(colors.gray)
-        print("> " .. code)
-        
-        -- Compile the single line code safely
-        local func, err = load(code, "ai_generated", "t", _ENV)
-        if func then
-            -- Run the function safely without crashing the main script
-            local success, runErr = pcall(func)
-            if success then
-                term.setTextColor(colors.lime)
-                print("[System] Success!")
-            else
-                term.setTextColor(colors.red)
-                print("[System] Runtime Error: " .. tostring(runErr))
-            end
-		sendRoleMessage("output", "Success: " .. success .. " err: " .. err)
-        else
-            term.setTextColor(colors.red)
-            print("[System] Syntax Error: " .. tostring(err))
-        end
-        term.setTextColor(colors.white)
-    end
-end
+-- ========================
+-- SEND ROLE MESSAGE
+-- ========================
+local function sendRoleMessage(role, content)
+    table.insert(messages, { role = role, content = content })
 
--- Load the system prompt and populate chat context from clean text export logs
-local function loadSystemAndHistory()
-    if not fs.exists(SYSTEM_FILE) then
-        local file = fs.open(SYSTEM_FILE, "w")
-        file.writeLine("You are an advanced CC:Tweaked OS assistant. You can execute live single-line Lua commands by wrapping them exactly like this: [EXECUTE]fs.makeDir('folder')[/EXECUTE]. Only use valid ComputerCraft APIs.")
-        file.close()
+    local reply = sendRequest()
+
+    if reply then
+        reply = sanitizeText(reply)
+
+        appendToHistoryFile(role, content)
+        appendToHistoryFile("AI", reply)
+
+        table.insert(messages, { role = "assistant", content = reply })
+        return reply
     end
 
-    local file = fs.open(SYSTEM_FILE, "r")
-    local systemContent = file.readAll()
-    file.close()
-
-    -- Establish live runtime table session with system context
-    messages = {
-        { role = "system", content = systemContent }
-    }
-
-    -- Reconstruct live context arrays using clean textual log files
-    if fs.exists(HISTORY_FILE) then
-        term.setTextColor(colors.gray)
-        print("[Last session restored]:")
-        
-        local histFile = fs.open(HISTORY_FILE, "r")
-        local line = histFile.readLine()
-        
-        while line do
-            if line:sub(1, 5) == "You: " then
-                local content = line:sub(6)
-                table.insert(messages, { role = "user", content = content })
-                
-                term.setTextColor(colors.green)
-                write("You: ")
-                term.setTextColor(colors.white)
-                print(content)
-                
-            elseif line:sub(1, 4) == "AI: " then
-                local content = line:sub(5)
-                table.insert(messages, { role = "assistant", content = content })
-                
-                term.setTextColor(colors.cyan)
-                write("AI: ")
-                term.setTextColor(colors.lightGray)
-                printWrapped(content)
-                print("")
-            end
-            
-            line = histFile.readLine()
-        end
-        histFile.close()
-        
-        term.setTextColor(colors.yellow)
-        print("---------------------------------------")
-    end
-end
-
--- HTTP POST request with string length fix
-local function askAI(prompt)
-    table.insert(messages, { role = "user", content = prompt })
-    
-    local payloadData = textutils.serializeJSON({
-        model = MODEL, 
-        messages = messages,
-        max_tokens = 250
-    })
-    
-    local headers = {
-        ["Authorization"] = "Bearer " .. API_KEY,
-        ["Content-Type"] = "application/json",
-        ["Content-Length"] = tostring(#payloadData),
-        ["HTTP-Referer"] = "https://openrouter.ai", 
-        ["X-Title"] = "CcShell Terminal Assistant",
-        ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
-    }
-    
-    print("\n[CcShellAI] Sending direct API request...")
-    
-    local response, err = http.post(URL, payloadData, headers)
-    
-    if not response then
-        printError("\n[NETWORK ERROR] Handshake refused.")
-        if err then print("Details: " .. tostring(err)) end
-        table.remove(messages)
-        return nil
-    end
-    
-    local responseText = response.readAll()
-    local statusCode = response.getResponseCode()
-    response.close()
-    
-    if statusCode ~= 200 then
-        printError("\n[API ERROR] Status code: " .. tostring(statusCode))
-        print(responseText:sub(1, 150))
-        table.remove(messages)
-        return nil
-    end
-    
-    local data = textutils.unserializeJSON(responseText)
-    if data and data.choices and type(data.choices) == "table" then
-        for _, choice in pairs(data.choices) do
-            if choice.message and choice.message.content then
-                local aiReply = sanitizeText(choice.message.content)
-                
-                -- Save cleanly to text log file after confirming a successful 200 status code
-                appendToHistoryFile("You", prompt)
-                appendToHistoryFile("AI", aiReply)
-                
-                table.insert(messages, { role = "assistant", content = aiReply })
-                return aiReply
-            end
-        end
-    end
-    
-    printError("\n[FORMAT ERROR] Invalid JSON received.")
     table.remove(messages)
     return nil
 end
 
--- Start Terminal Loop
+-- ========================
+-- EXECUTE + CAPTURE OUTPUT
+-- ========================
+local function executeLuaCommands(text)
+    for code in string.gmatch(text, "%[EXECUTE%](.-)%[%/EXECUTE%]") do
+        term.setTextColor(colors.purple)
+        print("\n[Executing]")
+        term.setTextColor(colors.gray)
+        print("> " .. code)
+
+        local output = {}
+        local oldPrint = print
+
+        print = function(...)
+            local t = {}
+            for i, v in ipairs({...}) do
+                t[i] = tostring(v)
+            end
+            local line = table.concat(t, "\t")
+            table.insert(output, line)
+            oldPrint(line)
+        end
+
+        local func, err = load(code, "ai", "t", _ENV)
+
+        if func then
+            local results = { pcall(func) }
+            local success = table.remove(results, 1)
+
+            print = oldPrint
+
+            local msg = ""
+
+            if #output > 0 then
+                msg = msg .. "Printed Output:\n" .. table.concat(output, "\n") .. "\n"
+            end
+
+            if #results > 0 then
+                msg = msg .. "Return Values:\n"
+                for _, v in ipairs(results) do
+                    msg = msg .. tostring(v) .. "\n"
+                end
+            end
+
+            if msg == "" then msg = "No output." end
+
+            sendRoleMessage("output", msg)
+
+            if success then
+                term.setTextColor(colors.lime)
+                print("[Success]")
+            else
+                term.setTextColor(colors.red)
+                print("[Runtime Error]")
+            end
+        else
+            print = oldPrint
+            term.setTextColor(colors.red)
+            print("[Syntax Error]")
+            sendRoleMessage("output", "Syntax Error: " .. tostring(err))
+        end
+
+        term.setTextColor(colors.white)
+    end
+end
+
+-- ========================
+-- LOAD SYSTEM + HISTORY
+-- ========================
+local function loadSystemAndHistory()
+    if not fs.exists(SYSTEM_FILE) then
+        local f = fs.open(SYSTEM_FILE, "w")
+        f.writeLine("You are a CC:Tweaked assistant. Use [EXECUTE]...[/EXECUTE] for commands.")
+        f.close()
+    end
+
+    local f = fs.open(SYSTEM_FILE, "r")
+    local sys = f.readAll()
+    f.close()
+
+    messages = {
+        { role = "system", content = sys }
+    }
+end
+
+-- ========================
+-- MAIN LOOP
+-- ========================
 term.clear()
 term.setCursorPos(1,1)
+
 getApiKey()
 
-term.clear()
-term.setCursorPos(1,1)
 term.setTextColor(colors.yellow)
-print("=== CcShell AI Terminal ===")
+print("=== CcShell AI ===")
 term.setTextColor(colors.white)
-print("Model: " .. MODEL)
-print("Commands: 'exit' | 'clear'\n")
 
--- Load system rules and render past text logs
 loadSystemAndHistory()
 
 while true do
     term.setTextColor(colors.green)
     write("You: ")
     term.setTextColor(colors.white)
+
     local input = read()
-    
-    if input:lower() == "exit" then 
-        break
-    elseif input:lower() == "clear" then
-        if fs.exists(HISTORY_FILE) then fs.delete(HISTORY_FILE) end
-        term.clear()
-        term.setCursorPos(1,1)
-        loadSystemAndHistory()
-        term.setTextColor(colors.purple)
-        print("[System] History cleared.\n")
-    elseif input ~= "" then
+
+    if input == "exit" then break end
+
+    if input ~= "" then
         local reply = askAI(input)
+
         if reply then
             term.setTextColor(colors.cyan)
             write("AI: ")
             term.setTextColor(colors.lightGray)
             printWrapped(reply)
-            
-            -- Intercept and run code tags instantly
+
             executeLuaCommands(reply)
             print("")
         end

@@ -150,34 +150,79 @@ end
 
 --Extracts and runs Lua code block from AI reply
 local function executeLuaCommands(text)
-    -- Look for [EXECUTE]...[/EXECUTE] tags
     for code in string.gmatch(text, "%[EXECUTE%](.-)%[%/EXECUTE%]") do
         term.setTextColor(colors.purple)
         print("\n[System] Executing AI command...")
         term.setTextColor(colors.gray)
         print("> " .. code)
-        
-        -- Compile the single line code safely
+
+        -- Capture printed output
+        local outputBuffer = {}
+        local oldPrint = print
+
+        print = function(...)
+            local args = { ... }
+            local line = ""
+            for i, v in ipairs(args) do
+                line = line .. tostring(v) .. (i < #args and "\t" or "")
+            end
+            table.insert(outputBuffer, line)
+            oldPrint(line) -- still show on terminal
+        end
+
+        -- Compile
         local func, err = load(code, "ai_generated", "t", _ENV)
+
         if func then
-            -- Run the function safely without crashing the main script
-            local success, runErr = pcall(func)
+            -- Run safely and capture return values
+            local results = { pcall(func) }
+            local success = table.remove(results, 1)
+
+            -- Restore print immediately after execution
+            print = oldPrint
+
             if success then
                 term.setTextColor(colors.lime)
                 print("[System] Success!")
             else
                 term.setTextColor(colors.red)
-                print("[System] Runtime Error: " .. tostring(runErr))
+                print("[System] Runtime Error: " .. tostring(results[1]))
             end
-		sendRoleMessage("output", "Success: " .. success .. " err: " .. err .. " runErr: " .. runErr)
+
+            -- Build output string
+            local outputText = ""
+
+            if #outputBuffer > 0 then
+                outputText = outputText .. "Printed Output:\n" .. table.concat(outputBuffer, "\n") .. "\n"
+            end
+
+            if #results > 0 then
+                outputText = outputText .. "Return Values:\n"
+                for i, v in ipairs(results) do
+                    outputText = outputText .. tostring(v) .. "\n"
+                end
+            end
+
+            if outputText == "" then
+                outputText = "No output."
+            end
+
+            -- Send full execution result back to AI
+            sendRoleMessage("output", outputText)
+
         else
+            -- Restore print if load failed
+            print = oldPrint
+
             term.setTextColor(colors.red)
             print("[System] Syntax Error: " .. tostring(err))
+
+            sendRoleMessage("output", "Syntax Error: " .. tostring(err))
         end
+
         term.setTextColor(colors.white)
     end
 end
-
 -- Load the system prompt and populate chat context from clean text export logs
 local function loadSystemAndHistory()
     if not fs.exists(SYSTEM_FILE) then
