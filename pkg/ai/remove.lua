@@ -1,5 +1,5 @@
 local function remove(path)
-if fs.exists(path) then fs.delete(path) else print("Skipping " .. path)
+if fs.exists(path) then fs.delete(path) else print("Skipping " .. path) end
 end
 remove("/bin/ai.lua")
 remove("/var/.ai_system")
