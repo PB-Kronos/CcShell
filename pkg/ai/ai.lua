@@ -1,4 +1,4 @@
--- AI Chatbot for CC:Tweaked (Stable + Output Capture)
+-- AI Chatbot for CC:Tweaked (Stable + Execute Output Capture + Clear + Compact)
 
 local KEY_FILE = "/var/.ai_key"
 local SYSTEM_FILE = "/var/.ai_system"
@@ -11,10 +11,11 @@ local API_KEY = ""
 local messages = {}
 
 -- ========================
--- TEXT SANITIZER
+-- SANITIZE
 -- ========================
 local function sanitizeText(text)
     if not text then return "" end
+
     text = text:gsub("\226\128\153", "'")
     text = text:gsub("\226\128\152", "'")
     text = text:gsub("\226\128\156", '"')
@@ -23,14 +24,14 @@ local function sanitizeText(text)
     text = text:gsub("\226\128\148", "--")
     text = text:gsub("\226\128\162", "*")
 
-    local clean = {}
+    local out = {}
     for i = 1, #text do
         local b = text:byte(i)
         if (b >= 32 and b <= 126) or b == 10 or b == 13 then
-            table.insert(clean, string.char(b))
+            out[#out + 1] = string.char(b)
         end
     end
-    return table.concat(clean)
+    return table.concat(out)
 end
 
 -- ========================
@@ -58,7 +59,7 @@ end
 -- PRINT WRAP
 -- ========================
 local function printWrapped(text)
-    local w = term.getSize()
+    local w, _ = term.getSize()
     for line in text:gmatch("[^\n]+") do
         while #line > w do
             print(line:sub(1, w))
@@ -78,7 +79,26 @@ local function appendToHistoryFile(sender, text)
 end
 
 -- ========================
--- SAFE HTTP REQUEST
+-- SYSTEM LOAD
+-- ========================
+local function loadSystemAndHistory()
+    if not fs.exists(SYSTEM_FILE) then
+        local f = fs.open(SYSTEM_FILE, "w")
+        f.writeLine("You are a CC:Tweaked assistant. Use [EXECUTE]...[/EXECUTE] for commands.")
+        f.close()
+    end
+
+    local f = fs.open(SYSTEM_FILE, "r")
+    local sys = f.readAll()
+    f.close()
+
+    messages = {
+        { role = "system", content = sys }
+    }
+end
+
+-- ========================
+-- HTTP (RETRY SAFE)
 -- ========================
 local function sendRequest()
     local payload = textutils.serializeJSON({
@@ -97,9 +117,7 @@ local function sendRequest()
     }
 
     for attempt = 1, 3 do
-        print("[Request attempt " .. attempt .. "]")
-
-        local res, err = http.post(URL, payload, headers)
+        local res = http.post(URL, payload, headers)
 
         if res then
             local txt = res.readAll()
@@ -108,7 +126,6 @@ local function sendRequest()
 
             if code == 200 and txt and txt:find("{") then
                 local ok, data = pcall(textutils.unserializeJSON, txt)
-
                 if ok and data and data.choices and data.choices[1] then
                     return data.choices[1].message.content
                 end
@@ -132,51 +149,49 @@ local function askAI(prompt)
     end
 
     local reply = sendRequest()
-
-    if reply then
-        reply = sanitizeText(reply)
-
-        appendToHistoryFile("You", prompt)
-        appendToHistoryFile("AI", reply)
-
-        table.insert(messages, { role = "assistant", content = reply })
-        return reply
+    if not reply then
+        table.remove(messages)
+        printError("[FAILED] No response")
+        return nil
     end
 
-    table.remove(messages)
-    printError("[FAILED] No valid response.")
-    return nil
+    reply = sanitizeText(reply)
+
+    appendToHistoryFile("You", prompt)
+    appendToHistoryFile("AI", reply)
+
+    table.insert(messages, { role = "assistant", content = reply })
+    return reply
 end
 
 -- ========================
--- SEND ROLE MESSAGE
+-- ROLE MESSAGE (OUTPUT)
 -- ========================
 local function sendRoleMessage(role, content)
     table.insert(messages, { role = role, content = content })
 
     local reply = sendRequest()
-
-    if reply then
-        reply = sanitizeText(reply)
-
-        appendToHistoryFile(role, content)
-        appendToHistoryFile("AI", reply)
-
-        table.insert(messages, { role = "assistant", content = reply })
-        return reply
+    if not reply then
+        table.remove(messages)
+        return nil
     end
 
-    table.remove(messages)
-    return nil
+    reply = sanitizeText(reply)
+
+    appendToHistoryFile(role, content)
+    appendToHistoryFile("AI", reply)
+
+    table.insert(messages, { role = "assistant", content = reply })
+    return reply
 end
 
 -- ========================
--- EXECUTE + CAPTURE OUTPUT
+-- EXECUTION + CAPTURE
 -- ========================
 local function executeLuaCommands(text)
     for code in string.gmatch(text, "%[EXECUTE%](.-)%[%/EXECUTE%]") do
         term.setTextColor(colors.purple)
-        print("\n[Executing]")
+        print("\n[EXECUTE]")
         term.setTextColor(colors.gray)
         print("> " .. code)
 
@@ -184,16 +199,16 @@ local function executeLuaCommands(text)
         local oldPrint = print
 
         print = function(...)
-            local t = {}
-            for i, v in ipairs({...}) do
-                t[i] = tostring(v)
+            local t = {...}
+            local line = ""
+            for i, v in ipairs(t) do
+                line = line .. tostring(v) .. (i < #t and "\t" or "")
             end
-            local line = table.concat(t, "\t")
-            table.insert(output, line)
+            output[#output + 1] = line
             oldPrint(line)
         end
 
-        local func, err = load(code, "ai", "t", _ENV)
+        local func, err = load(code, "ai_exec", "t", _ENV)
 
         if func then
             local results = { pcall(func) }
@@ -237,37 +252,81 @@ local function executeLuaCommands(text)
 end
 
 -- ========================
--- LOAD SYSTEM + HISTORY
+-- CLEAR HISTORY
 -- ========================
-local function loadSystemAndHistory()
-    if not fs.exists(SYSTEM_FILE) then
-        local f = fs.open(SYSTEM_FILE, "w")
-        f.writeLine("You are a CC:Tweaked assistant. Use [EXECUTE]...[/EXECUTE] for commands.")
-        f.close()
+local function clearHistory()
+    if fs.exists(HISTORY_FILE) then
+        fs.delete(HISTORY_FILE)
     end
+    loadSystemAndHistory()
 
-    local f = fs.open(SYSTEM_FILE, "r")
-    local sys = f.readAll()
-    f.close()
-
-    messages = {
-        { role = "system", content = sys }
-    }
+    term.setTextColor(colors.purple)
+    print("[System] History cleared.")
+    term.setTextColor(colors.white)
 end
 
 -- ========================
--- MAIN LOOP
+-- COMPACT MEMORY
+-- ========================
+local function compactHistory()
+    if #messages < 3 then
+        print("[System] Nothing to compact.")
+        return
+    end
+
+    term.setTextColor(colors.yellow)
+    print("[System] Compacting...")
+
+    local transcript = ""
+    for i = 2, #messages do
+        local m = messages[i]
+        transcript = transcript .. m.role .. ": " .. m.content .. "\n"
+    end
+
+    local prompt = "Summarize into compact memory:\n\n" .. transcript
+
+    local old = messages
+
+    messages = {
+        old[1],
+        { role = "user", content = prompt }
+    }
+
+    local reply = sendRequest()
+
+    if reply then
+        reply = sanitizeText(reply)
+
+        messages = {
+            old[1],
+            { role = "system", content = "Memory: " .. reply }
+        }
+
+        local f = fs.open(HISTORY_FILE, "w")
+        f.writeLine("SYSTEM: compacted")
+        f.writeLine(reply)
+        f.close()
+
+        print("[System] Compact complete.")
+    else
+        messages = old
+        printError("[System] Compact failed.")
+    end
+
+    term.setTextColor(colors.white)
+end
+
+-- ========================
+-- MAIN
 -- ========================
 term.clear()
 term.setCursorPos(1,1)
 
 getApiKey()
-
-term.setTextColor(colors.yellow)
-print("=== CcShell AI ===")
-term.setTextColor(colors.white)
-
 loadSystemAndHistory()
+
+print("=== CcTweaked AI ===")
+print("Commands: /exit | /clear | /compact")
 
 while true do
     term.setTextColor(colors.green)
@@ -276,9 +335,16 @@ while true do
 
     local input = read()
 
-    if input == "exit" then break end
+    if input == "/exit" then
+        break
 
-    if input ~= "" then
+    elseif input == "/clear" then
+        clearHistory()
+
+    elseif input == "/compact" then
+        compactHistory()
+
+    elseif input ~= "" then
         local reply = askAI(input)
 
         if reply then
