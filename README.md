@@ -175,15 +175,6 @@ The package tree is meant to stay small and explicit:
 - `bridgefs` installs file helpers
 - `fun` and `http` add optional ROM program trees
 
-### Web preview
-
-The local dashboard preview lives under `computer/0/webman/index.html`.
-
-Open it directly in a browser for the simplest preview, or use the bundled local server so the same file is available over the LAN.
-The dashboard action channel listens on `ws://<host>:8011` and the page stays locked until you log in.
-
----
-
 ## Notes
 
 - This project is Windows-first.
