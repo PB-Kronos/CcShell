@@ -10,7 +10,7 @@ PORT = 8010
 
 
 class Handler(SimpleHTTPRequestHandler):
-    server_version = "CraftDeskBuddyWeb/1.0"
+    server_version = "CraftMan/1.0"
 
     def end_headers(self) -> None:
         self.send_header("Cache-Control", "no-store")
@@ -30,7 +30,7 @@ class Handler(SimpleHTTPRequestHandler):
 def main() -> None:
     handler = partial(Handler, directory=str(WEB_ROOT))
     server = ThreadingHTTPServer(("0.0.0.0", PORT), handler)
-    print(f"CraftDeskBuddy static server listening on http://0.0.0.0:{PORT}")
+    print(f"CraftMan static server listening on http://0.0.0.0:{PORT}")
     server.serve_forever()
 
 
