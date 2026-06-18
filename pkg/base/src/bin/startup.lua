@@ -45,6 +45,28 @@ if term.isColor() then
     shell.setAlias( "foreground", "fg" )
 end
 
+if shell and shell.openTab and fs.exists("/web.lua") then
+    shell.openTab("/web.lua daemon")
+end
+
+local function loadWebmanStartupMeta()
+    local path = "/var/webman/startup.json"
+    if not fs.exists(path) then
+        return {}
+    end
+    local handle = fs.open(path, "r")
+    if not handle then
+        return {}
+    end
+    local raw = handle.readAll()
+    handle.close()
+    local ok, data = pcall(textutils.unserializeJSON, raw)
+    if ok and type(data) == "table" then
+        return data
+    end
+    return {}
+end
+
 -- Setup completion functions
 local function completeMultipleChoice( sText, tOptions, bAddSpaces )
     local tResults = {}
@@ -256,8 +278,9 @@ end
 local function findStartups( sBaseDir )
     local tStartups = nil
     local sBasePath = "/" .. fs.combine( sBaseDir, "startup" )
+    local tMeta = loadWebmanStartupMeta()
     local sStartupNode = shell.resolveProgram( sBasePath )
-    if sStartupNode then
+    if sStartupNode and tMeta[sStartupNode] ~= false then
         tStartups = { sStartupNode }
     end
     -- It's possible that there is a startup directory and a startup.lua file, so this has to be
@@ -268,7 +291,7 @@ local function findStartups( sBaseDir )
         end
         for _,v in pairs( fs.list( sBasePath ) ) do
             local sPath = "/" .. fs.combine( sBasePath, v )
-            if not fs.isDir( sPath ) then
+            if not fs.isDir( sPath ) and tMeta[sPath] ~= false then
                 tStartups[ #tStartups + 1 ] = sPath
             end
         end

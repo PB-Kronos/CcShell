@@ -409,7 +409,9 @@
         if (!snapshot || typeof snapshot !== "object") return;
         cwd = snapshot.cwd || cwd;
         processes = snapshot.processes || [];
-        peripherals = snapshot.peripherals || [];
+        peripherals = Array.isArray(snapshot.peripherals)
+          ? snapshot.peripherals
+          : [];
         redstone = snapshot.redstone || {};
         startupScripts = snapshot.startup || [];
         events = snapshot.events || [];
@@ -457,17 +459,34 @@
       }
 
       function renderPeripherals() {
-        els.peripheralList.innerHTML = "";
-        (peripherals || []).forEach((p) => {
-          const li = document.createElement("li");
-          li.innerHTML = `<button><div class="path">${esc(p.side)}</div><div class="tiny">${esc(p.type)}</div></button><span class="tiny">${esc(p.name || "")}</span>`;
-          li.querySelector("button").onclick = () => {
-            els.monitorSide.textContent = p.side;
-            els.monitorSideCopy.textContent = p.side;
-          };
-          els.peripheralList.appendChild(li);
-        });
-        els.redstoneState.textContent = redstone && Object.keys(redstone).length ? "available" : "unknown";
+          els.peripheralList.innerHTML = "";
+
+          const list = Array.isArray(peripherals)
+              ? peripherals
+              : [];
+
+          list.forEach((p) => {
+              const li = document.createElement("li");
+
+              li.innerHTML =
+                  `<button>
+                      <div class="path">${esc(p.side)}</div>
+                      <div class="tiny">${esc(p.type)}</div>
+                   </button>
+                   <span class="tiny">${esc(p.name || "")}</span>`;
+
+              li.querySelector("button").onclick = () => {
+                  els.monitorSide.textContent = p.side;
+                  els.monitorSideCopy.textContent = p.side;
+              };
+
+              els.peripheralList.appendChild(li);
+          });
+
+          els.redstoneState.textContent =
+              redstone && Object.keys(redstone).length
+                  ? "available"
+                  : "unknown";
       }
 
       function renderStartup() {
@@ -535,7 +554,24 @@
           setConnection("offline", `Disconnected from ${wsURL()}`);
           return;
         }
-        setConnection(socket.readyState === WebSocket.OPEN ? "online" : "connecting", `Connected to ${wsURL()}`);
+
+        switch (socket.readyState) {
+          case WebSocket.CONNECTING:
+            setConnection("connecting", `Connecting to ${wsURL()}`);
+            break;
+
+          case WebSocket.OPEN:
+            setConnection("online", `Connected to ${wsURL()}`);
+            break;
+
+          case WebSocket.CLOSING:
+            setConnection("closing", `Closing connection`);
+            break;
+
+          default:
+            setConnection("offline", `Disconnected from ${wsURL()}`);
+            break;
+        }
       }
 
       function scheduleReconnect() {
@@ -548,6 +584,8 @@
 
       function handleMessage(raw) {
         const msg = safeJson(raw);
+        console.log("WS RX:", msg);
+        console.log("RECEIVED", raw);
         if (!msg || typeof msg !== "object") return;
         if (msg.type === "hello") {
           setupRequired = !!msg.setupRequired;
@@ -602,6 +640,7 @@
           socket = ws;
 
           ws.onopen = () => {
+            console.log("CONNECTED");
             setConnection("online", `Connected to ${wsURL()}`);
             resolve(ws);
             socketReady = null;
@@ -612,10 +651,12 @@
           };
 
           ws.onerror = () => {
+            console.log("ERROR");
             setConnection("error", `WebSocket error on ${wsURL()}`);
           };
 
           ws.onclose = () => {
+            console.log("CLOSED");
             for (const [id, entry] of pending.entries()) {
               entry.reject(new Error("WebSocket disconnected"));
               pending.delete(id);
@@ -641,6 +682,7 @@
         return await new Promise((resolve, reject) => {
           pending.set(id, { resolve, reject });
           try {
+            console.log("WS TX:", payload);
             ws.send(message);
           } catch (err) {
             pending.delete(id);
@@ -760,18 +802,36 @@
         }
         try {
           const action = setupRequired ? "setup" : "login";
-          const data = await rpc({ kind: "auth", action, password, confirm, token: sessionToken });
-          if (data.token) {
-            sessionToken = data.token;
+          const data = await rpc({
+            kind: "auth",
+            action,
+            password,
+            confirm,
+            token: sessionToken
+          });
+
+          const result = data.result || {};
+
+          if (result.token) {
+            sessionToken = result.token;
             localStorage.setItem(LS_TOKEN, sessionToken);
           }
-          authenticated = true;
-          setupRequired = false;
+
+          authenticated = !!result.authenticated;
+          setupRequired = !!result.setupRequired;
+
           els.loginPassword.value = "";
           els.loginConfirm.value = "";
+
           renderLock();
-          unlockUI();
-          if (data.snapshot) applySnapshot(data.snapshot);
+
+          if (authenticated) {
+            unlockUI();
+          }
+
+          if (result.snapshot) {
+            applySnapshot(result.snapshot);
+          }
           await loadFiles(cwd);
           if (startupScripts.length) {
             startupSelection = startupScripts[0].path;
@@ -902,16 +962,29 @@
           await connectSocket();
           if (sessionToken) {
             try {
-              const resume = await rpc({ kind: "auth", action: "resume", token: sessionToken });
-              authenticated = !!resume.authenticated;
-              setupRequired = !!resume.setupRequired;
-              renderLock();
-              if (authenticated) {
-                unlockUI();
-                if (resume.snapshot) applySnapshot(resume.snapshot);
-                els.cmdOutput.textContent = "Dashboard ready.\n";
-                await loadFiles(cwd);
+              const resume = await rpc({
+              kind: "auth",
+              action: "resume",
+              token: sessionToken
+            });
+
+            const result = resume.result || {};
+
+            authenticated = !!result.authenticated;
+            setupRequired = !!result.setupRequired;
+
+            renderLock();
+
+            if (authenticated) {
+              unlockUI();
+
+              if (result.snapshot) {
+                applySnapshot(result.snapshot);
               }
+
+              els.cmdOutput.textContent = "Dashboard ready.\n";
+              await loadFiles(cwd);
+            }
             } catch {
               authenticated = false;
               sessionToken = "";

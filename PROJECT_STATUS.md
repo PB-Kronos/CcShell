@@ -8,6 +8,7 @@ Last updated: 2026-06-18
 - The main runtime pieces are `base`, `sys`, and `bridgefs`.
 - Host-side Python helpers are configured through `python_path`.
 - The repo is being prepared for a local web management interface and an AI chat agent package.
+- A single-file `computer/0/webman/index.html` preview now exists for the dashboard UI, with a CraftOS WebSocket daemon on port `8011` and a login gate before the app is revealed.
 
 ## Major Recent Changes
 
@@ -32,6 +33,7 @@ Last updated: 2026-06-18
 ## Open Work
 
 - Finalize the local web management interface.
+- Wire the `computer/0/webman` UI to any new backend features once the preview UI stabilizes.
 - Integrate the AI chat agent package cleanly.
 - Keep wiki pages in sync with the current command and package surface.
 - Confirm launch and Python path behavior across emulator and Minecraft-style installs.

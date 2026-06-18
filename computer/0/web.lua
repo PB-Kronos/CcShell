@@ -86,9 +86,6 @@ local function taskbar_status()
 end
 
 local function taskbar_set(action)
-    if not load_sys() then
-        error("sys bridge is not available", 0)
-    end
     if action == "hide" then
         return sys.taskbar_hide()
     elseif action == "show" then
@@ -96,8 +93,7 @@ local function taskbar_set(action)
     elseif action == "toggle" then
         return sys.taskbar_toggle()
     elseif action == "status" then
-        return sys.taskbar_status()
-    end
+        return sys.taskbar_status() end
     error("unknown taskbar action: " .. tostring(action), 0)
 end
 
@@ -211,8 +207,15 @@ local function auth_required()
     return load_auth() == nil
 end
 
+local tokenCounter = math.random(0,9999)
+
 local function new_token()
-    return string.format("%x-%x-%x", now_ms(), math.random(0, 0x7fffffff), math.random(0, 0x7fffffff))
+    tokenCounter = math.random(0,9999)
+    return tostring(now_ms())
+        .. "-"
+        .. tostring(os.getComputerID())
+        .. "-"
+        .. tostring(tokenCounter)
 end
 
 local function create_session()
@@ -443,6 +446,10 @@ local function process_request(req, client)
         return snapshot(), false
 
     elseif kind == "taskbar" then
+        if action == "show" then sys.taskbar_show() end
+        if action == "hide" then sys.taskbar_hide() end
+        if action == "toggle" then sys.taskbar_toggle() end
+        if action == "status" then return{ sys.taskbar_status()} end
         return { taskbar = taskbar_set(action or req.mode or "status") }, action ~= "status"
 
     elseif kind == "files" then
@@ -516,9 +523,19 @@ local function process_request(req, client)
 end
 
 local function json_send(ws, payload)
-    local ok = pcall(function()
-        ws:send(textutils.serializeJSON(payload))
+    local encoded = textutils.serialiseJSON(payload)
+
+    print("ENCODED TYPE:", type(encoded))
+    print("WS TYPE:", type(ws))
+
+    local ok, err = pcall(function()
+        ws.send(encoded)
     end)
+
+    if not ok then
+        print("SEND ERROR:", err)
+    end
+
     return ok
 end
 
@@ -552,6 +569,7 @@ local function make_client(ws, client_id)
 end
 
 local function serve_message(client_id, client, message)
+    print("RX:", message)
     local ok, req = pcall(textutils.unserializeJSON, message)
     if not ok or type(req) ~= "table" then
         json_send(client.ws, {
@@ -581,7 +599,9 @@ local function serve_message(client_id, client, message)
             snapshot = client.authenticated and snapshot() or nil,
         }
     end
-
+	local ok = json_send(client.ws, response)
+	print("SEND OK:", ok)
+    print("TX:", textutils.serializeJSON(response))
     if not json_send(client.ws, response) then
         clients[client_id] = nil
         return
@@ -606,6 +626,7 @@ local function accept_loop()
 
         local client_id = tostring(ws.clientID or ws.clientId or ws.id or (#clients + 1))
         clients[client_id] = make_client(ws, client_id)
+        print("CONNECTED CLIENT:", client_id)
         append_event("system", "client connected", { clientID = client_id })
         json_send(ws, {
             type = "hello",
@@ -622,6 +643,7 @@ local function event_loop()
         local event, a, b, c = os.pullEvent()
         if event == "websocket_server_message" then
             local client_id = tostring(a)
+            print("MESSAGE CLIENT:", tostring(a))
             local client = clients[client_id]
             if client and not c then
                 serve_message(client_id, client, b)

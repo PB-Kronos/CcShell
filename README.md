@@ -72,6 +72,7 @@ So while it behaves like an OS in practice, the actual model is:
   - `http`
 - bridge access for filesystem operations and Windows taskbar control
 - startup logic that loads the `sys` layer automatically
+- a local `computer/0/webman/` dashboard preview that starts as a single HTML file and uses a CraftOS WebSocket daemon for actions
 
 ---
 
@@ -173,6 +174,13 @@ The package tree is meant to stay small and explicit:
 - `sys` installs the Lua bridge layer
 - `bridgefs` installs file helpers
 - `fun` and `http` add optional ROM program trees
+
+### Web preview
+
+The local dashboard preview lives under `computer/0/webman/index.html`.
+
+Open it directly in a browser for the simplest preview, or use the bundled local server so the same file is available over the LAN.
+The dashboard action channel listens on `ws://<host>:8011` and the page stays locked until you log in.
 
 ---
 
