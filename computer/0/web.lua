@@ -10,6 +10,7 @@ local WS_PORT = 8011
 
 local clients = {}
 local sessions = {}
+local userState = {}
 local server = nil
 
 local function ensure_dir(path)
@@ -86,17 +87,29 @@ local function taskbar_status()
 end
 
 local function taskbar_set(action)
+    print("TASKBAR ACTION:", action)
+
     if action == "hide" then
-        return sys.taskbar_hide()
+        local r = sys.taskbar_hide()
+        print("HIDE RESULT:", tostring(r))
+        return r
+
     elseif action == "show" then
-        return sys.taskbar_show()
+        local r = sys.taskbar_show()
+        print("SHOW RESULT:", tostring(r))
+        return r
+
     elseif action == "toggle" then
-        return sys.taskbar_toggle()
+        local r = sys.taskbar_toggle()
+        print("TOGGLE RESULT:", tostring(r))
+        return r
+
     elseif action == "status" then
-        return taskbar_status() end
+        return taskbar_status()
+    end
+
     error("unknown taskbar action: " .. tostring(action), 0)
 end
-
 local function append_event(kind, message, payload)
     local events = read_json(EVENTS, {})
     events[#events + 1] = {
@@ -218,14 +231,25 @@ local function new_token()
         .. tostring(tokenCounter)
 end
 
-local function create_session()
+local function create_session(client_id)
     local token = new_token()
+
     sessions[token] = {
         ts = now_ms(),
+        clientID = client_id,
     }
+
     return token
 end
+local function get_session(req)
+    local token = req.token
 
+    if type(token) ~= "string" or token == "" then
+        return nil
+    end
+
+    return sessions[token]
+end
 local function authenticate_token(token)
     return type(token) == "string" and sessions[token] ~= nil
 end
@@ -347,10 +371,6 @@ local function process_request(req, client)
         if action == "resume" then
             local token = req.token or req.sessionToken
             if authenticate_token(token) then
-                if client then
-                    client.authenticated = true
-                    client.token = token
-                end
                 return {
                     authenticated = true,
                     setupRequired = auth_required(),
@@ -376,10 +396,12 @@ local function process_request(req, client)
                 error("password mismatch", 0)
             end
             save_auth(password)
-            local token = create_session()
+            local token = create_session(client and client.id)
+            userState[token] = {
+                cwd = "/",
+                selectedFile = nil,
+            }
             if client then
-                client.authenticated = true
-                client.token = token
             end
             append_event("system", "password configured")
             return {
@@ -389,54 +411,62 @@ local function process_request(req, client)
                 snapshot = snapshot(),
             }, true
 
-        elseif action == "login" then
-            if not auth then
-                return {
-                    authenticated = false,
-                    setupRequired = true,
-                }, false
-            end
-            local password = tostring(req.password or "")
-            if password ~= auth.password then
-                error("invalid password", 0)
-            end
-            local token = create_session()
-            if client then
-                client.authenticated = true
-                client.token = token
-            end
-            append_event("system", "client authenticated")
-            return {
-                authenticated = true,
-                setupRequired = false,
-                token = token,
-                snapshot = snapshot(),
-            }, false
+            elseif action == "login" then
+                if not auth then
+                    return {
+                        authenticated = false,
+                        setupRequired = true,
+                    }, false
+                end
 
-        elseif action == "logout" then
-            if client and client.token then
-                sessions[client.token] = nil
-            end
-            if client then
-                client.authenticated = false
-                client.token = nil
-            end
-            return {
-                authenticated = false,
-                setupRequired = auth_required(),
-            }, false
+                local password = tostring(req.password or "")
+
+                if password ~= auth.password then
+                    error("invalid password", 0)
+                end
+
+                local token = create_session(client and client.id)
+
+                userState[token] = {
+                    cwd = "/",
+                    selectedFile = nil,
+                }
+
+                append_event("system", "client authenticated")
+
+                return {
+                    authenticated = true,
+                    setupRequired = false,
+                    token = token,
+                    snapshot = snapshot(),
+                }, false
+
+            elseif action == "logout" then
+        local token = req.token
+
+        if token then
+            userState[token] = nil
+            sessions[token] = nil
         end
+
+        return {
+            authenticated = false,
+            setupRequired = auth_required(),
+        }, false
+    end
         error("unknown auth action: " .. tostring(action), 0)
     end
 
-    if client and not client.authenticated then
+    local session = get_session(req)
+
+    if kind ~= "auth" and not session then
         error("auth required", 0)
     end
 
     if kind == "hello" then
         return {
             clientID = req.clientID,
-            authenticated = client and client.authenticated or false,
+            authenticated = false,
             setupRequired = auth_required(),
             port = WS_PORT,
             snapshot = snapshot(),
@@ -449,8 +479,9 @@ local function process_request(req, client)
         if action == "show" then sys.taskbar_show() end
         if action == "hide" then sys.taskbar_hide() end
         if action == "toggle" then sys.taskbar_toggle() end
-        if action == "status" then return{ sys.taskbar_status()} end
-        return { taskbar = taskbar_set(action or req.mode or "status") }, action ~= "status"
+        if action == "status" then
+            return {taskbar = sys.taskbar_status()}, false
+        end
 
     elseif kind == "files" then
         local sub = action or req.op
@@ -524,10 +555,6 @@ end
 
 local function json_send(ws, payload)
     local encoded = textutils.serialiseJSON(payload)
-
-    print("ENCODED TYPE:", type(encoded))
-    print("WS TYPE:", type(ws))
-
     local ok, err = pcall(function()
         ws.send(encoded)
     end)
@@ -538,7 +565,13 @@ local function json_send(ws, payload)
 
     return ok
 end
+local function send_to_client(client, payload)
+    if not client then
+        return false
+    end
 
+    return json_send(client.ws, payload)
+end
 local function send_snapshot_to_all(reason, payload)
     local data = {
         type = "snapshot",
@@ -548,23 +581,25 @@ local function send_snapshot_to_all(reason, payload)
     }
     local raw = textutils.serializeJSON(data)
     for client_id, client in pairs(clients) do
-        if client.authenticated then
-            local ok = pcall(function()
-                client.ws:send(raw)
-            end)
-            if not ok then
-                clients[client_id] = nil
-            end
-        end
+        local ok = json_send(client.ws, payload)
+
+        print(
+            "BROADCAST:",
+            client_id,
+            "OK:",
+            tostring(ok)
+        )
+
+        -- TEMPORARILY DISABLE REMOVAL
+        -- if not ok then
+        --     clients[client_id] = nil
+        -- end
     end
 end
-
 local function make_client(ws, client_id)
     return {
         id = client_id,
         ws = ws,
-        authenticated = false,
-        token = nil,
     }
 end
 
@@ -599,13 +634,13 @@ local function serve_message(client_id, client, message)
             snapshot = client.authenticated and snapshot() or nil,
         }
     end
-	local ok = json_send(client.ws, response)
-	print("SEND OK:", ok)
-    print("TX:", textutils.serializeJSON(response))
-    if not json_send(client.ws, response) then
-        clients[client_id] = nil
-        return
-    end
+    local ok = json_send(client.ws, response)
+    print("SEND OK:", ok)
+
+    --if not ok then
+        --clients[client_id] = nil
+        --return
+    --end
 
     if handled and mutated then
         append_event(req.kind or req.action or "request", "handled", req)
@@ -645,12 +680,19 @@ local function event_loop()
             local client_id = tostring(a)
             print("MESSAGE CLIENT:", tostring(a))
             local client = clients[client_id]
+            print("CLIENT EXISTS:", client ~= nil)
+            for id in pairs(clients) do
+                print("KNOWN:", id)
+            end
             if client and not c then
                 serve_message(client_id, client, b)
             end
-        elseif event == "websocket_server_closed" then
-            local client_id = tostring(a)
-            clients[client_id] = nil
+            elseif event == "websocket_server_closed" then
+                local client_id = tostring(a)
+
+                print("CLIENT CLOSED:", client_id)
+
+                clients[client_id] = nil
             append_event("system", "client disconnected", { clientID = client_id, code = b, message = c })
         elseif event == "terminate" then
             if server and server.close then
