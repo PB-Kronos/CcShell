@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>CraftOS-PC Dashboard</title>
+  <style>
+    :root{
+      --bg:#071019;--panel:#0f1724cc;--panel2:#101b2ccc;--line:#2d3d57;--text:#e8f0ff;--muted:#94a6be;
+      --accent:#63e4c3;--accent2:#f3b24c;--danger:#ff6c8c;--shadow:0 24px 80px rgba(0,0,0,.35);
+      --radius:22px;--mono:Consolas,Menlo,monospace;--sans:"Trebuchet MS","Segoe UI",system-ui,sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:var(--sans);color:var(--text);
+      background:radial-gradient(circle at 10% 10%,rgba(99,228,195,.16),transparent 24%),
+      radial-gradient(circle at 90% 0%,rgba(243,178,76,.15),transparent 24%),
+      linear-gradient(160deg,#05080d,var(--bg) 45%,#060a12);overflow-x:hidden}
+    body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:48px 48px;mask-image:linear-gradient(to bottom,rgba(0,0,0,.8),transparent 92%)}
+    body.locked #app{display:none}
+    body.locked #lockscreen{display:grid}
+    body.unlocked #lockscreen{display:none}
+    .wrap{width:min(1360px,calc(100vw - 24px));margin:0 auto;padding:18px 0 36px}
+    .hero,.panel,.nav,.lockcard{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid rgba(255,255,255,.07);box-shadow:var(--shadow);backdrop-filter:blur(12px)}
+    .hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,.7fr);gap:16px;padding:22px;border-radius:var(--radius);margin-bottom:16px}
+    .badge{display:inline-flex;gap:8px;align-items:center;padding:7px 11px;border-radius:999px;border:1px solid rgba(99,228,195,.25);background:rgba(99,228,195,.08);color:#bffdf0;font-size:11px;letter-spacing:.16em;text-transform:uppercase}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 6px rgba(99,228,195,.12)}
+    h1{margin:14px 0 10px;font-size:clamp(2rem,4.8vw,4rem);line-height:.95;letter-spacing:-.06em}
+    .lede{margin:0;color:var(--muted);font-size:15px;line-height:1.6;max-width:68ch}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}
+    .stat{padding:14px;border-radius:18px;background:rgba(0,0,0,.16);border:1px solid rgba(255,255,255,.05)}
+    .stat span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px}
+    .stat strong{font:700 13px var(--mono);word-break:break-word}
+    .hero-aside{display:grid;gap:10px;align-content:start}
+    .pill{display:inline-flex;gap:8px;align-items:center;width:fit-content;padding:9px 12px;border-radius:999px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);font-size:12px}
+    .light{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+    .tiny{color:var(--muted);font-size:12px;line-height:1.5}
+    .layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:start}
+    .nav{position:sticky;top:16px;padding:14px;border-radius:var(--radius)}
+    .nav a{display:flex;justify-content:space-between;gap:8px;padding:12px 12px;border-radius:14px;color:#cdd8ea;border:1px solid transparent;text-decoration:none}
+    .nav a:hover,.nav a.active{background:rgba(99,228,195,.08);border-color:rgba(99,228,195,.16);transform:translateX(2px)}
+    .nav ul{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+    .content{display:grid;gap:16px}
+    .panel{border-radius:var(--radius);padding:18px}
+    .head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}
+    .head h2{margin:0;font-size:13px;text-transform:uppercase;letter-spacing:.14em}
+    .head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+    .actions{display:flex;flex-wrap:wrap;gap:8px}
+    button,input,textarea,select{font:inherit;color:inherit}
+    .btn,.field{border-radius:14px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.18)}
+    .btn{padding:10px 13px;cursor:pointer}.btn:hover{background:rgba(99,228,195,.08);border-color:rgba(99,228,195,.24)}
+    .btn.primary{background:linear-gradient(135deg,rgba(99,228,195,.22),rgba(243,178,76,.12));border-color:rgba(99,228,195,.24)}
+    .btn.danger:hover{background:rgba(255,108,140,.08);border-color:rgba(255,108,140,.24)}
+    .field{padding:11px 13px;outline:none;width:100%}
+    .split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .box{border-radius:18px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.14);overflow:hidden}
+    .box h3{margin:0;font-size:12px;letter-spacing:.13em;text-transform:uppercase}
+    .box .bar{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)}
+    .box .body{padding:14px}
+    .list{list-style:none;margin:0;padding:0}.list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;border-radius:14px;background:rgba(255,255,255,.02);border:1px solid transparent}
+    .list li.active{border-color:rgba(99,228,195,.24);background:rgba(99,228,195,.08)}
+    .list button{border:0;background:transparent;color:inherit;cursor:pointer;text-align:left;padding:0}
+    .path{font-family:var(--mono);font-size:12px}
+    .table{overflow:auto;border:1px solid rgba(255,255,255,.06);border-radius:18px}
+    table{width:100%;border-collapse:collapse;min-width:620px}
+    th,td{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;text-align:left}
+    th{color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-size:11px;background:rgba(255,255,255,.02)}
+    textarea.field{min-height:270px;resize:vertical;font-family:var(--mono);line-height:1.5}
+    .footer{margin-top:14px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6}
+    .lockscreen{position:fixed;inset:0;display:none;place-items:center;padding:18px;z-index:20}
+    .lockcard{width:min(680px,100%);padding:28px;border-radius:28px}
+    .lockgrid{display:grid;gap:12px}
+    .lockgrid .split{grid-template-columns:1fr 1fr}
+    .lockactions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    .lockhint{margin-top:14px}
+    .hidden{display:none !important}
+    @media (max-width: 980px){.hero,.layout,.split,.grid3,.lockgrid .split{grid-template-columns:1fr}.nav{position:static}}
+    @media (max-width: 720px){.wrap{width:min(100vw - 12px,100vw);padding-top:6px}.hero,.panel,.nav,.lockcard{border-radius:18px}}
+  </style>
+</head>
+<body class="locked">
+  <div id="lockscreen" class="lockscreen">
+    <div class="lockcard">
+      <div class="badge"><span class="dot"></span> Access required</div>
+      <h1>Sign in to CcShell</h1>
+      <p class="lede" id="lock-description">This dashboard stays hidden until the websocket server accepts your login. If this is the first time the server has run, set the password here.</p>
+      <form id="login-form" class="lockgrid">
+        <div class="split">
+          <input id="login-password" class="field" type="password" placeholder="Password" autocomplete="current-password" />
+          <input id="login-confirm" class="field hidden" type="password" placeholder="Confirm password" autocomplete="new-password" />
+        </div>
+        <div class="lockactions">
+          <button class="btn primary" id="login-submit" type="submit">Unlock</button>
+          <span class="tiny" id="login-status">Waiting for server.</span>
+        </div>
+      </form>
+      <div class="tiny lockhint">Nothing below this panel is visible until login succeeds.</div>
+    </div>
+  </div>
+
+  <div id="app" class="wrap">
+    <section class="hero">
+      <div>
+        <div class="badge"><span class="dot"></span> CraftOS-PC dashboard</div>
+        <h1>Local dashboard for CcShell</h1>
+        <p class="lede">A single-file website that talks directly to a CraftOS websocket server over the local network. The browser only reveals the main UI after login.</p>
+        <div class="grid3">
+          <div class="stat"><span>Server</span><strong id="status-running">waiting</strong></div>
+          <div class="stat"><span>Computer</span><strong id="status-computer">0</strong></div>
+          <div class="stat"><span>Taskbar</span><strong id="status-taskbar">unknown</strong></div>
+        </div>
+      </div>
+      <aside class="hero-aside">
+        <div class="pill"><span class="light"></span><span id="connection-label">Starting up</span></div>
+        <div class="tiny">Open on the host at <code>http://127.0.0.1:8010</code> or from another machine on your LAN using the host IP.</div>
+        <div class="tiny">The CraftOS daemon lives in <code>/computer/0/web.lua</code> and is launched from startup.</div>
+      </aside>
+    </section>
+
+    <div class="layout">
+      <nav class="nav">
+        <ul id="nav-list">
+          <li><a href="#status" data-section="status" class="active">Status <span>01</span></a></li>
+          <li><a href="#files" data-section="files">Files <span>02</span></a></li>
+          <li><a href="#processes" data-section="processes">Processes <span>03</span></a></li>
+          <li><a href="#peripherals" data-section="peripherals">Peripherals <span>04</span></a></li>
+          <li><a href="#startup" data-section="startup">Startup <span>05</span></a></li>
+          <li><a href="#events" data-section="events">Events <span>06</span></a></li>
+          <li><a href="#connection" data-section="connection">Connection <span>07</span></a></li>
+        </ul>
+      </nav>
+
+      <main class="content">
+        <section id="status" class="panel">
+          <div class="head">
+            <div><h2>Status</h2><p>Taskbar controls and quick actions.</p></div>
+            <div class="actions">
+              <button class="btn primary" data-action="taskbar-toggle">Toggle taskbar</button>
+              <button class="btn" data-action="taskbar-hide">Hide</button>
+              <button class="btn" data-action="taskbar-show">Show</button>
+              <button class="btn" data-action="refresh">Refresh</button>
+            </div>
+          </div>
+          <div class="split">
+            <div class="box">
+              <div class="bar"><h3>Shell</h3><span class="tiny">local state from CraftOS</span></div>
+              <div class="body">
+                <div class="actions">
+                  <button class="btn" data-action="spawn-event">Add event</button>
+                  <button class="btn danger" data-action="clear-events">Clear log</button>
+                </div>
+                <p class="tiny" style="margin-top:12px">The page updates over the websocket link. If the backend restarts, the connection will retry automatically.</p>
+              </div>
+            </div>
+            <div class="box">
+              <div class="bar"><h3>Notes</h3><span class="tiny">LAN-ready</span></div>
+              <div class="body"><p class="tiny" style="margin:0">The browser only sees this panel after login. Remote users on the same network can open the site as long as ports <code>8010</code> and <code>8011</code> are reachable.</p></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="files" class="panel">
+          <div class="head">
+            <div><h2>Files</h2><p>Browse and edit CraftOS files.</p></div>
+            <div class="actions">
+              <button class="btn" data-action="file-new">New file</button>
+              <button class="btn" data-action="folder-new">New folder</button>
+              <button class="btn" data-action="file-up">Up</button>
+              <button class="btn" data-action="file-save">Save</button>
+              <button class="btn" data-action="file-revert">Revert</button>
+              <button class="btn" data-action="file-rename">Rename</button>
+              <button class="btn danger" data-action="file-delete">Delete</button>
+            </div>
+          </div>
+          <div class="split">
+            <div class="box">
+              <div class="bar"><h3>Explorer</h3><span class="tiny" id="files-cwd">/</span></div>
+              <div class="body">
+                <ul id="file-tree" class="list"></ul>
+              </div>
+            </div>
+            <div class="box">
+              <div class="bar"><h3>Editor</h3><span class="tiny" id="selected-file">/bin/startup.lua</span></div>
+              <div class="body">
+                <textarea id="file-editor" class="field" spellcheck="false"></textarea>
+                <div class="tiny" id="file-message" style="margin-top:10px">Select a file to edit.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="processes" class="panel">
+          <div class="head">
+            <div><h2>Processes</h2><p>Shell tabs and command execution.</p></div>
+            <div class="actions">
+              <input id="cmd-input" class="field" style="width:320px" placeholder="e.g. taskbar status" />
+              <button class="btn primary" id="cmd-send-2" data-action="cmd-send">Send</button>
+              <button class="btn" data-action="cmd-up">↑</button>
+              <button class="btn" data-action="cmd-down">↓</button>
+            </div>
+          </div>
+          <div class="split">
+            <div class="box">
+              <div class="bar"><h3>Processes</h3><span class="tiny">from multishell</span></div>
+              <div class="body"><div class="table"><table><thead><tr><th>PID</th><th>Name</th><th>Status</th><th>Focus</th></tr></thead><tbody id="process-table"></tbody></table></div></div>
+            </div>
+            <div class="box">
+              <div class="bar"><h3>Console</h3><span class="tiny">command output</span></div>
+              <div class="body"><pre id="cmd-output" class="field" style="margin:0;min-height:210px;white-space:pre-wrap"></pre></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="peripherals" class="panel">
+          <div class="head">
+            <div><h2>Peripherals</h2><p>Read-only hardware state and redstone status.</p></div>
+            <div class="actions">
+              <button class="btn" data-action="periph-mount">Refresh</button>
+              <button class="btn" data-action="periph-unmount">Refresh list</button>
+              <button class="btn" data-action="redstone-cycle">Refresh redstone</button>
+            </div>
+          </div>
+          <div class="split">
+            <div class="box">
+              <div class="bar"><h3>Mounted</h3><span class="tiny">attached devices</span></div>
+              <div class="body"><ul id="peripheral-list" class="list"></ul></div>
+            </div>
+            <div class="box">
+              <div class="bar"><h3>Monitor / Redstone</h3><span class="tiny" id="monitor-side">left</span></div>
+              <div class="body">
+                <div class="grid3" style="margin-top:0">
+                  <div class="stat"><span>State</span><strong id="redstone-state">unknown</strong></div>
+                  <div class="stat"><span>Selected side</span><strong id="monitor-side-copy">left</strong></div>
+                  <div class="stat"><span>Back-end</span><strong>CraftOS</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="startup" class="panel">
+          <div class="head">
+            <div><h2>Startup</h2><p>Manage boot scripts and run them on demand.</p></div>
+            <div class="actions">
+              <button class="btn" data-action="startup-new">New script</button>
+              <button class="btn" data-action="startup-run">Run now</button>
+              <button class="btn" data-action="startup-toggle">Toggle enabled</button>
+            </div>
+          </div>
+          <div class="split">
+            <div class="box">
+              <div class="bar"><h3>Scripts</h3><span class="tiny" id="startup-selected">/bin/startup.lua</span></div>
+              <div class="body"><ul id="startup-list" class="list"></ul></div>
+            </div>
+            <div class="box">
+              <div class="bar"><h3>Editor</h3><span class="tiny" id="startup-state">enabled</span></div>
+              <div class="body">
+                <textarea id="startup-editor" class="field" spellcheck="false"></textarea>
+                <div class="tiny" id="startup-message" style="margin-top:10px">Select a script to edit.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="events" class="panel">
+          <div class="head">
+            <div><h2>Events</h2><p>Live event log from the daemon.</p></div>
+            <div class="actions">
+              <input id="event-filter" class="field" style="width:240px" placeholder="filter events" />
+              <button class="btn" data-action="events-pause">Pause</button>
+              <button class="btn danger" data-action="events-clear">Clear</button>
+            </div>
+          </div>
+          <div class="box">
+            <div class="bar"><h3>Event stream</h3><span class="tiny" id="events-count">0 events</span></div>
+            <div class="body"><pre id="event-log" class="field" style="margin:0;min-height:250px;white-space:pre-wrap"></pre></div>
+          </div>
+        </section>
+
+        <section id="connection" class="panel">
+          <div class="head">
+            <div><h2>Connection</h2><p>WebSocket status and session controls.</p></div>
+            <div class="actions">
+              <button class="btn" data-action="ws-logout">Logout</button>
+              <button class="btn" data-action="ws-reconnect">Reconnect</button>
+            </div>
+          </div>
+          <div class="split">
+            <div class="box">
+              <div class="bar"><h3>Session</h3><span class="tiny" id="ws-status">Disconnected</span></div>
+              <div class="body">
+                <p class="tiny" id="ws-detail" style="margin:0 0 12px">Waiting for authentication.</p>
+                <div class="actions">
+                  <button class="btn primary" data-action="ws-reconnect">Reconnect</button>
+                </div>
+              </div>
+            </div>
+            <div class="box">
+              <div class="bar"><h3>Security</h3><span class="tiny">locked</span></div>
+              <div class="body">
+                <p class="tiny" style="margin:0">The dashboard stays hidden until a password is accepted. The login form is the only visible surface before that.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="footer">This page uses one HTML file. The browser talks directly to the CraftOS WebSocket daemon on port 8011; the host only serves the static page on port 8010.</div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const WS_PORT = 8011;
+      const LS_TOKEN = "webman_token";
+      const $ = (id) => document.getElementById(id);
+      const els = {
+        statusRunning: $("status-running"),
+        statusComputer: $("status-computer"),
+        statusTaskbar: $("status-taskbar"),
+        connectionLabel: $("connection-label"),
+        filesCwd: $("files-cwd"),
+        fileTree: $("file-tree"),
+        selectedFile: $("selected-file"),
+        fileEditor: $("file-editor"),
+        fileMessage: $("file-message"),
+        processTable: $("process-table"),
+        cmdInput: $("cmd-input"),
+        cmdOutput: $("cmd-output"),
+        peripheralList: $("peripheral-list"),
+        monitorSide: $("monitor-side"),
+        monitorSideCopy: $("monitor-side-copy"),
+        redstoneState: $("redstone-state"),
+        startupList: $("startup-list"),
+        startupSelected: $("startup-selected"),
+        startupEditor: $("startup-editor"),
+        startupState: $("startup-state"),
+        startupMessage: $("startup-message"),
+        eventLog: $("event-log"),
+        eventsCount: $("events-count"),
+        eventFilter: $("event-filter"),
+        wsStatus: $("ws-status"),
+        wsDetail: $("ws-detail"),
+        lockscreen: $("lockscreen"),
+        loginForm: $("login-form"),
+        loginPassword: $("login-password"),
+        loginConfirm: $("login-confirm"),
+        loginStatus: $("login-status"),
+        loginSubmit: $("login-submit"),
+        lockDescription: $("lock-description"),
+      };
+
+      let cwd = "/";
+      let selectedFile = "/bin/startup.lua";
+      let startupSelection = "/bin/startup.lua";
+      let files = [];
+      let processes = [];
+      let peripherals = [];
+      let redstone = {};
+      let startupScripts = [];
+      let events = [];
+      let paused = false;
+      let history = [];
+      let historyIndex = -1;
+      let socket = null;
+      let socketReady = null;
+      let reconnectTimer = null;
+      let pending = new Map();
+      let requestId = 1;
+      let authenticated = false;
+      let setupRequired = true;
+      let sessionToken = localStorage.getItem(LS_TOKEN) || "";
+
+      function safeJson(text) {
+        try { return JSON.parse(text); } catch { return null; }
+      }
+
+      function esc(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[ch]);
+      }
+
+      function wsURL() {
+        const host = location.hostname || "127.0.0.1";
+        const protocol = location.protocol === "https:" ? "wss" : "ws";
+        return `${protocol}://${host}:${WS_PORT}`;
+      }
+
+      function parentPath(path) {
+        const parts = String(path).split("/").filter(Boolean);
+        parts.pop();
+        return "/" + parts.join("/");
+      }
+
+      function setConnection(state, detail) {
+        els.wsStatus.textContent = state;
+        els.wsDetail.textContent = detail;
+        els.connectionLabel.textContent = detail;
+        els.statusRunning.textContent = state === "online" ? "online" : state;
+      }
+
+      function applySnapshot(snapshot) {
+        if (!snapshot || typeof snapshot !== "object") return;
+        cwd = snapshot.cwd || cwd;
+        processes = snapshot.processes || [];
+        peripherals = snapshot.peripherals || [];
+        redstone = snapshot.redstone || {};
+        startupScripts = snapshot.startup || [];
+        events = snapshot.events || [];
+        els.statusComputer.textContent = snapshot.computerId != null ? String(snapshot.computerId) : "0";
+        els.statusTaskbar.textContent = snapshot.taskbar || "unknown";
+        renderAll();
+      }
+
+      function renderFiles() {
+        els.filesCwd.textContent = cwd;
+        els.fileTree.innerHTML = "";
+        if (cwd !== "/") {
+          const li = document.createElement("li");
+          li.innerHTML = `<button>📁 ..</button><span class="tiny">up</span>`;
+          li.querySelector("button").onclick = () => loadFiles(parentPath(cwd) || "/");
+          els.fileTree.appendChild(li);
+        }
+        if (!files.length) {
+          const li = document.createElement("li");
+          li.style.justifyContent = "center";
+          li.style.color = "var(--muted)";
+          li.textContent = "(empty)";
+          els.fileTree.appendChild(li);
+          return;
+        }
+        files.forEach((entry) => {
+          const li = document.createElement("li");
+          if (entry.path === selectedFile) li.classList.add("active");
+          li.innerHTML = `<button>${entry.type === "dir" ? "📁" : "📄"} <span class="path">${esc(entry.name)}</span></button><span class="tiny">${entry.type === "dir" ? "dir" : `${entry.size ?? 0} B`}</span>`;
+          li.querySelector("button").onclick = () => {
+            if (entry.type === "dir") loadFiles(entry.path);
+            else openFile(entry.path);
+          };
+          els.fileTree.appendChild(li);
+        });
+      }
+
+      function renderProcesses() {
+        els.processTable.innerHTML = "";
+        (processes || []).forEach((p) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${esc(p.pid ?? "?")}</td><td>${esc(p.name ?? "shell")}</td><td>${p.active ? "active" : "idle"}</td><td>${p.active ? "yes" : "no"}</td>`;
+          els.processTable.appendChild(tr);
+        });
+      }
+
+      function renderPeripherals() {
+        els.peripheralList.innerHTML = "";
+        (peripherals || []).forEach((p) => {
+          const li = document.createElement("li");
+          li.innerHTML = `<button><div class="path">${esc(p.side)}</div><div class="tiny">${esc(p.type)}</div></button><span class="tiny">${esc(p.name || "")}</span>`;
+          li.querySelector("button").onclick = () => {
+            els.monitorSide.textContent = p.side;
+            els.monitorSideCopy.textContent = p.side;
+          };
+          els.peripheralList.appendChild(li);
+        });
+        els.redstoneState.textContent = redstone && Object.keys(redstone).length ? "available" : "unknown";
+      }
+
+      function renderStartup() {
+        els.startupList.innerHTML = "";
+        els.startupSelected.textContent = startupSelection;
+        const selected = startupScripts.find((s) => s.path === startupSelection) || startupScripts[0];
+        els.startupState.textContent = selected ? (selected.enabled ? "enabled" : "disabled") : "unknown";
+        startupScripts.forEach((s) => {
+          const li = document.createElement("li");
+          if (s.path === startupSelection) li.classList.add("active");
+          li.innerHTML = `<button>${s.runsOnBoot ? "🚀" : "📄"} <span class="path">${esc(s.path)}</span></button><span class="tiny">${s.enabled ? "enabled" : "disabled"}</span>`;
+          li.querySelector("button").onclick = async () => {
+            startupSelection = s.path;
+            const data = await rpc({ kind: "startup", action: "read", path: s.path });
+            els.startupEditor.value = data?.result?.content || "";
+            els.startupMessage.textContent = `Loaded ${s.path}`;
+            renderStartup();
+          };
+          els.startupList.appendChild(li);
+        });
+      }
+
+      function renderEvents() {
+        const filter = (els.eventFilter.value || "").toLowerCase();
+        const visible = events.filter((e) => !filter || JSON.stringify(e).toLowerCase().includes(filter));
+        els.eventsCount.textContent = `${visible.length} / ${events.length} events`;
+        els.eventLog.textContent = visible.length ? visible.map((e) => `[${new Date(e.ts || Date.now()).toLocaleTimeString()}] ${e.type}: ${e.message}`).join("\n") : "(no events yet)";
+      }
+
+      function renderLock() {
+        if (setupRequired) {
+          els.lockDescription.textContent = "This dashboard stays hidden until the websocket server accepts your login. Set a password the first time you connect.";
+          els.loginConfirm.classList.remove("hidden");
+          els.loginSubmit.textContent = "Set password";
+        } else {
+          els.lockDescription.textContent = "This dashboard stays hidden until the websocket server accepts your login.";
+          els.loginConfirm.classList.add("hidden");
+          els.loginSubmit.textContent = "Unlock";
+        }
+        els.loginStatus.textContent = authenticated ? "Authenticated." : "Waiting for server.";
+      }
+
+      function renderAll() {
+        renderFiles();
+        renderProcesses();
+        renderPeripherals();
+        renderStartup();
+        renderEvents();
+        const pauseBtn = document.querySelector('[data-action="events-pause"]');
+        if (pauseBtn) pauseBtn.textContent = paused ? "Resume" : "Pause";
+      }
+
+      function unlockUI() {
+        document.body.classList.remove("locked");
+        document.body.classList.add("unlocked");
+      }
+
+      function lockUI() {
+        document.body.classList.add("locked");
+        document.body.classList.remove("unlocked");
+      }
+
+      function refreshConnectionText() {
+        if (!socket) {
+          setConnection("offline", `Disconnected from ${wsURL()}`);
+          return;
+        }
+        setConnection(socket.readyState === WebSocket.OPEN ? "online" : "connecting", `Connected to ${wsURL()}`);
+      }
+
+      function scheduleReconnect() {
+        if (reconnectTimer) return;
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          connectSocket().catch(() => {});
+        }, 1500);
+      }
+
+      function handleMessage(raw) {
+        const msg = safeJson(raw);
+        if (!msg || typeof msg !== "object") return;
+        if (msg.type === "hello") {
+          setupRequired = !!msg.setupRequired;
+          authenticated = !!msg.authenticated;
+          renderLock();
+          if (msg.snapshot) applySnapshot(msg.snapshot);
+          if (msg.authenticated) unlockUI();
+          refreshConnectionText();
+          return;
+        }
+        if (msg.type === "auth") {
+          setupRequired = !!msg.setupRequired;
+          authenticated = !!msg.authenticated;
+          renderLock();
+          if (msg.token) {
+            sessionToken = msg.token;
+            localStorage.setItem(LS_TOKEN, sessionToken);
+          }
+          if (msg.snapshot) applySnapshot(msg.snapshot);
+          if (msg.authenticated) unlockUI();
+          refreshConnectionText();
+          return;
+        }
+        if (msg.type === "snapshot") {
+          if (msg.snapshot) applySnapshot(msg.snapshot);
+          return;
+        }
+        if (msg.snapshot) {
+          applySnapshot(msg.snapshot);
+        }
+        if (msg.id != null && pending.has(String(msg.id))) {
+          const entry = pending.get(String(msg.id));
+          pending.delete(String(msg.id));
+          if (msg.ok === false) {
+            entry.reject(new Error(msg.error || "request failed"));
+          } else {
+            entry.resolve(msg);
+          }
+        }
+      }
+
+      function connectSocket() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          return Promise.resolve(socket);
+        }
+        if (socketReady) {
+          return socketReady;
+        }
+
+        socketReady = new Promise((resolve, reject) => {
+          const ws = new WebSocket(wsURL());
+          socket = ws;
+
+          ws.onopen = () => {
+            setConnection("online", `Connected to ${wsURL()}`);
+            resolve(ws);
+            socketReady = null;
+          };
+
+          ws.onmessage = (event) => {
+            handleMessage(event.data);
+          };
+
+          ws.onerror = () => {
+            setConnection("error", `WebSocket error on ${wsURL()}`);
+          };
+
+          ws.onclose = () => {
+            for (const [id, entry] of pending.entries()) {
+              entry.reject(new Error("WebSocket disconnected"));
+              pending.delete(id);
+            }
+            socket = null;
+            socketReady = null;
+            authenticated = false;
+            lockUI();
+            renderLock();
+            refreshConnectionText();
+            scheduleReconnect();
+          };
+        });
+
+        return socketReady;
+      }
+
+      async function rpc(payload) {
+        const ws = await connectSocket();
+        const id = String(requestId++);
+        const message = JSON.stringify({ id, token: sessionToken, ...payload });
+
+        return await new Promise((resolve, reject) => {
+          pending.set(id, { resolve, reject });
+          try {
+            ws.send(message);
+          } catch (err) {
+            pending.delete(id);
+            reject(err);
+          }
+        });
+      }
+
+      async function refreshState() {
+        const data = await rpc({ kind: "state" });
+        applySnapshot(data.snapshot || data.result || data);
+      }
+
+      async function loadFiles(path) {
+        cwd = path || "/";
+        const data = await rpc({ kind: "files", action: "list", path: cwd });
+        files = data.result?.entries || [];
+        renderFiles();
+      }
+
+      async function openFile(path) {
+        selectedFile = path;
+        const data = await rpc({ kind: "files", action: "read", path });
+        els.fileEditor.value = data.result?.content || "";
+        els.selectedFile.textContent = path;
+        els.fileMessage.textContent = `Loaded ${path}`;
+        renderFiles();
+      }
+
+      async function saveFile() {
+        const data = await rpc({ kind: "files", action: "write", path: selectedFile, content: els.fileEditor.value });
+        if (data.ok === false) throw new Error(data.error || "save failed");
+        els.fileMessage.textContent = `Saved ${selectedFile}`;
+        await refreshState();
+        await loadFiles(cwd);
+      }
+
+      async function newFile() {
+        const path = prompt("New file path", `${cwd === "/" ? "" : cwd}/new.lua`);
+        if (!path) return;
+        await rpc({ kind: "files", action: "write", path, content: "" });
+        selectedFile = path;
+        await loadFiles(cwd);
+        await openFile(path);
+      }
+
+      async function newFolder() {
+        const path = prompt("New folder path", `${cwd === "/" ? "" : cwd}/new-folder`);
+        if (!path) return;
+        await rpc({ kind: "files", action: "mkdir", path });
+        await loadFiles(cwd);
+      }
+
+      async function renameSelected() {
+        const to = prompt("Rename to", selectedFile);
+        if (!to || to === selectedFile) return;
+        await rpc({ kind: "files", action: "rename", from: selectedFile, to });
+        selectedFile = to;
+        await loadFiles(cwd);
+        await openFile(to);
+      }
+
+      async function deleteSelected() {
+        if (!confirm(`Delete ${selectedFile}?`)) return;
+        await rpc({ kind: "files", action: "delete", path: selectedFile });
+        selectedFile = cwd === "/" ? "/bin/startup.lua" : cwd;
+        await loadFiles(cwd);
+        await refreshState();
+      }
+
+      async function sendCommand() {
+        const cmd = els.cmdInput.value.trim();
+        if (!cmd) return;
+        history.push(cmd);
+        historyIndex = history.length;
+        const data = await rpc({ kind: "command", cmd });
+        els.cmdOutput.textContent = `[${new Date().toLocaleTimeString()}] > ${cmd}\n${JSON.stringify(data.result || data)}\n\n` + els.cmdOutput.textContent;
+        els.cmdInput.value = "";
+        await refreshState();
+      }
+
+      async function taskbar(action) {
+        await rpc({ kind: "taskbar", action });
+        await refreshState();
+      }
+
+      async function startupAction(action) {
+        const payload = { kind: "startup", action, path: startupSelection };
+        if (action === "write") payload.content = els.startupEditor.value;
+        const data = await rpc(payload);
+        if (action === "toggle" && data.result) {
+          const item = startupScripts.find((s) => s.path === data.result.path);
+          if (item) item.enabled = data.result.enabled;
+        }
+        await refreshState();
+      }
+
+      function cycleHistory(dir) {
+        if (!history.length) return;
+        if (dir < 0) historyIndex = historyIndex <= 0 ? history.length - 1 : historyIndex - 1;
+        else historyIndex = historyIndex >= history.length - 1 ? 0 : historyIndex + 1;
+        els.cmdInput.value = history[historyIndex] || "";
+      }
+
+      async function doLogin() {
+        const password = els.loginPassword.value.trim();
+        const confirm = els.loginConfirm.value.trim();
+        if (!password) {
+          els.loginStatus.textContent = "Enter a password.";
+          return;
+        }
+        if (setupRequired) {
+          if (!confirm || confirm !== password) {
+            els.loginStatus.textContent = "Passwords do not match.";
+            return;
+          }
+        }
+        try {
+          const action = setupRequired ? "setup" : "login";
+          const data = await rpc({ kind: "auth", action, password, confirm, token: sessionToken });
+          if (data.token) {
+            sessionToken = data.token;
+            localStorage.setItem(LS_TOKEN, sessionToken);
+          }
+          authenticated = true;
+          setupRequired = false;
+          els.loginPassword.value = "";
+          els.loginConfirm.value = "";
+          renderLock();
+          unlockUI();
+          if (data.snapshot) applySnapshot(data.snapshot);
+          await loadFiles(cwd);
+          if (startupScripts.length) {
+            startupSelection = startupScripts[0].path;
+            const startup = await rpc({ kind: "startup", action: "read", path: startupSelection });
+            els.startupEditor.value = startup.result?.content || "";
+          }
+          els.loginStatus.textContent = "Authenticated.";
+        } catch (err) {
+          els.loginStatus.textContent = err.message || "Login failed.";
+        }
+      }
+
+      function wireButtons() {
+        document.querySelectorAll("[data-action]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const action = btn.dataset.action;
+            try {
+              if (action === "taskbar-toggle") await taskbar("toggle");
+              else if (action === "taskbar-hide") await taskbar("hide");
+              else if (action === "taskbar-show") await taskbar("show");
+              else if (action === "refresh") await refreshState();
+              else if (action === "spawn-event") await rpc({ kind: "events", action: "append", type: "ui", message: "manual event" });
+              else if (action === "clear-events") { await rpc({ kind: "events", action: "clear" }); events = []; renderEvents(); }
+              else if (action === "file-new") await newFile();
+              else if (action === "folder-new") await newFolder();
+              else if (action === "file-up") { cwd = parentPath(cwd) || "/"; await loadFiles(cwd); }
+              else if (action === "file-save") await saveFile();
+              else if (action === "file-revert") await openFile(selectedFile);
+              else if (action === "file-rename") await renameSelected();
+              else if (action === "file-delete") await deleteSelected();
+              else if (action === "cmd-send" || action === "cmd-send-2") await sendCommand();
+              else if (action === "cmd-up") cycleHistory(-1);
+              else if (action === "cmd-down") cycleHistory(1);
+              else if (action === "periph-mount" || action === "periph-unmount" || action === "redstone-cycle") await refreshState();
+              else if (action === "startup-new") {
+                const path = prompt("Startup script path", "/startup/new.lua");
+                if (path) {
+                  startupSelection = path;
+                  await rpc({ kind: "startup", action: "write", path, content: "" });
+                  await refreshState();
+                }
+              } else if (action === "startup-run") {
+                await startupAction("run");
+              } else if (action === "startup-toggle") {
+                await startupAction("toggle");
+              } else if (action === "events-pause") {
+                paused = !paused;
+                btn.textContent = paused ? "Resume" : "Pause";
+              } else if (action === "ws-reconnect") {
+                if (socket) {
+                  try { socket.close(); } catch {}
+                }
+                await connectSocket();
+                if (authenticated) {
+                  await refreshState();
+                  await loadFiles(cwd);
+                }
+              } else if (action === "ws-logout") {
+                try {
+                  await rpc({ kind: "auth", action: "logout", token: sessionToken });
+                } catch {}
+                authenticated = false;
+                sessionToken = "";
+                localStorage.removeItem(LS_TOKEN);
+                lockUI();
+                renderLock();
+                if (socket) {
+                  try { socket.close(); } catch {}
+                }
+              }
+            } catch (err) {
+              els.connectionLabel.textContent = err.message || "request failed";
+              setConnection("error", err.message || "request failed");
+            }
+          });
+        });
+      }
+
+      function wireInputs() {
+        els.cmdInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            sendCommand();
+          } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            cycleHistory(-1);
+          } else if (event.key === "ArrowDown") {
+            event.preventDefault();
+            cycleHistory(1);
+          }
+        });
+
+        els.eventFilter.addEventListener("input", renderEvents);
+
+        els.fileEditor.addEventListener("input", () => {
+          els.fileMessage.textContent = `${selectedFile} edited`;
+        });
+
+        els.startupEditor.addEventListener("input", () => {
+          els.startupMessage.textContent = `${startupSelection} edited`;
+        });
+
+        els.loginForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          doLogin();
+        });
+      }
+
+      function wireNav() {
+        const links = document.querySelectorAll("#nav-list a");
+        function sync() {
+          const id = location.hash.replace("#", "") || "status";
+          links.forEach((link) => link.classList.toggle("active", link.dataset.section === id));
+        }
+        links.forEach((link) => link.addEventListener("click", () => setTimeout(sync, 0)));
+        window.addEventListener("hashchange", sync);
+        sync();
+      }
+
+      async function bootstrap() {
+        wireButtons();
+        wireInputs();
+        wireNav();
+        renderLock();
+        setConnection("connecting", `Connecting to ${wsURL()}`);
+        els.cmdOutput.textContent = "Waiting for authentication...\n";
+        try {
+          await connectSocket();
+          if (sessionToken) {
+            try {
+              const resume = await rpc({ kind: "auth", action: "resume", token: sessionToken });
+              authenticated = !!resume.authenticated;
+              setupRequired = !!resume.setupRequired;
+              renderLock();
+              if (authenticated) {
+                unlockUI();
+                if (resume.snapshot) applySnapshot(resume.snapshot);
+                els.cmdOutput.textContent = "Dashboard ready.\n";
+                await loadFiles(cwd);
+              }
+            } catch {
+              authenticated = false;
+              sessionToken = "";
+              localStorage.removeItem(LS_TOKEN);
+            }
+          }
+        } catch (err) {
+          setConnection("error", err.message || "backend unavailable");
+          els.loginStatus.textContent = err.message || "backend unavailable";
+        }
+        setInterval(async () => {
+          if (!paused && authenticated) {
+            try {
+              await refreshState();
+              await loadFiles(cwd);
+            } catch {
+              // keep the current view if the websocket drops momentarily
+            }
+          }
+        }, 2500);
+      }
+
+      bootstrap();
+    })();
+  </script>
+</body>
+</html>
