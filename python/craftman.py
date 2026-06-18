@@ -5,7 +5,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-WEB_ROOT = HERE.parent / "computer" / "0" / "webman"
+WEB_ROOT = HERE.parent / "computer" / "0" / "var" / "craftman"
 PORT = 8010
 
 
