@@ -93,7 +93,7 @@ local function taskbar_set(action)
     elseif action == "toggle" then
         return sys.taskbar_toggle()
     elseif action == "status" then
-        return sys.taskbar_status() end
+        return taskbar_status() end
     error("unknown taskbar action: " .. tostring(action), 0)
 end
 
