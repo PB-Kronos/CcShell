@@ -1,3 +1,0 @@
-Tap the screen with two fingers to show the navigation bar.
-See available gestures using "help gestures".
-Extend CraftOS-PC with plugins in the "plugins" program.
