@@ -38,37 +38,6 @@ local function saveDB(db)
     f.close()
 end
 
-local function clearCache()
-    local cache_root = "/var/cache"
-    if not fs.exists(cache_root) then
-        return 0
-    end
-
-    local removed = 0
-    local function removeTree(path)
-        if not fs.exists(path) then
-            return
-        end
-
-        if fs.isDir(path) then
-            for _, name in ipairs(fs.list(path)) do
-                removeTree(fs.combine(path, name))
-            end
-            fs.delete(path)
-        else
-            fs.delete(path)
-        end
-        removed = removed + 1
-    end
-
-    for _, name in ipairs(fs.list(cache_root)) do
-        removeTree(fs.combine(cache_root, name))
-    end
-
-    print("Cleared cache:", cache_root)
-    return removed
-end
-
 local function isInstalled(pkg, db)
     db = db or loadDB()
     return db[pkg] ~= nil
@@ -231,23 +200,37 @@ function install(pkg, seen, ...)
         return false, depErr
     end
 
-    local ok, err = runRemote(pkg .. "/install.lua", ...)
-    if not ok then
-        print("Install failed:", err)
-        return false, err
-    end
+	local ok, status, msg = runRemote(pkg .. "/install.lua", ...)
+	if not ok then
+	    print("Installer crashed:", status)
+	    return
+	end
+        local version = "unknown"
+        local desc = "no description"
+        version = manifest.version or version
+        desc = manifest.desc or desc
 
-    local version = "unknown"
-    local desc = "no description"
-
-    version = manifest.version or version
-    desc = manifest.desc or desc
-
-    local db = loadDB()
-    db[pkg] = { version = version, desc = desc }
-    saveDB(db)
-
-    print("Installed:", pkg)
+	if status == "success" then
+		local db = loadDB()
+    		db[pkg] = { version = version, desc = desc }
+		saveDB(db)
+	elseif status == "cancelled" then
+	    print(msg or "Installation cancelled.")
+	    return
+	
+	elseif status == "failed" then
+	    print(msg or "Installation failed.")
+	    return	
+	elseif status == "reboot" then
+	    print("Installation completed. Rebooting...")
+	    local db = loadDB()
+    	    db[pkg] = { version = version, desc = desc }
+	    saveDB(db)
+	    os.reboot()
+	else
+	    print("Unknown installer status:", tostring(status))
+    return
+end
     return true
 end
 
@@ -275,9 +258,6 @@ end
 
 local function upgrade(pkg, ...)
     local path = pkg .. "/upgrade.lua"
-
-    clearCache()
-
     local code = fetch(REPO .. "/" .. path)
     if code then
         print("Running upgrade script for:", pkg)
@@ -381,7 +361,6 @@ elseif cmd == "-U" then
     end
 
 elseif cmd == "-Syu" then
-    clearCache()
     syncAll()
 
 elseif cmd == "-Q" then
